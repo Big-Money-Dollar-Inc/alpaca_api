@@ -1,17 +1,26 @@
 from datetime import datetime
+from typing import Any
+
 from requests import Session
-from typing import List, Optional, Dict, Any
+
+from alpaca_api_exceptions import (
+    InvalidLimitParameterError,
+    InvalidSortParameterError,
+    JsonResponseError,
+    NonOkResponseError,
+)
+
+OK_RESPONSE_CODE = 200
+CRYPTO_MIN_DATA_POINTS = 1
+CRYPTO_MAX_DATA_POINTS = 10000
+
 
 class AlpacaMarketDataAPI:
     """
     Alpaca REST Client for accessing Alpaca's market data API.
     """
-    def __init__(
-        self,
-        api_key: str,
-        api_secret: str,
-        request_session: Optional[Session] = None
-    ):
+
+    def __init__(self, api_key: str, api_secret: str, request_session: Session | None = None):
         """
         :param api_key: Your Alpaca API key ID.
         :param api_secret: Your Alpaca API secret.
@@ -26,43 +35,37 @@ class AlpacaMarketDataAPI:
         self.session.headers.update(self._headers(api_key, api_secret))
 
     @staticmethod
-    def _headers(api_key: str, api_secret: str) -> Dict[str, str]:
+    def _headers(api_key: str, api_secret: str) -> dict[str, str]:
         return {
             "APCA-API-KEY-ID": api_key,
             "APCA-API-SECRET-KEY": api_secret,
             "Content-Type": "application/json",
         }
 
-    def _request(
-        self,
-        method: str,
-        path: str,
-        **kwargs: Any
-    ) -> Dict[str, Any]:
+    def _request(self, method: str, path: str, **kwargs: Any) -> dict[str, Any]:
         url = f"{self.base_url}{path}"
         resp = self.session.request(method, url, **kwargs)
 
-        OK_RESPONSE_CODE = 200
-
         if resp.status_code != OK_RESPONSE_CODE:
-            try:
-                error_data = resp.json()
-            except ValueError:
-                error_data = {"error": "Unknown error occurred"}
-            raise Exception(f"Error {resp.status_code}: {error_data.get('message', 'No message provided')}")
+            raise NonOkResponseError(resp.status_code)
+
+        try:
+            resp.json()
+        except Exception:
+            raise JsonResponseError() from None
 
         return resp.json()
 
     def get_historical_auctions(
         self,
-        symbols: Optional[str] = None,
-        start: Optional[datetime] = None,
-        end: Optional[datetime] = None,
-        limit: Optional[int] = None
-    ) -> Dict[str, Any]:
+        symbols: str | None = None,
+        start: datetime | None = None,
+        end: datetime | None = None,
+        limit: int | None = None,
+    ) -> dict[str, Any]:
         """
         Fetch historical auction data for a given symbol.
-        
+
         :param symbol: The stock symbol to fetch auctions for.
         :param start: Start date in ISO format (YYYY-MM-DD).
         :param end: End date in ISO format (YYYY-MM-DD).
@@ -73,7 +76,7 @@ class AlpacaMarketDataAPI:
             "symbols": symbols,
             "start": start.strftime("%Y-%m-%dT%H:%M:%SZ") if start else None,
             "end": end.strftime("%Y-%m-%dT%H:%M:%SZ") if end else None,
-            "limit": limit
+            "limit": limit,
         }
         return self._request("GET", "/v2/stocks/auctions", params=params)
 
@@ -81,22 +84,22 @@ class AlpacaMarketDataAPI:
         self,
         symbols: str,
         timeframe: str = "1H",
-        start: Optional[datetime] = None,
-        end: Optional[datetime] = None,
-        limit: Optional[int] = None,
-        feed: Optional[str] = "iex",
-        page_token: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        start: datetime | None = None,
+        end: datetime | None = None,
+        limit: int | None = None,
+        feed: str | None = "iex",
+        page_token: str | None = None,
+    ) -> dict[str, Any]:
         """
         Fetch historical bar data for a given symbol.
-        
+
         :param symbol: The stock symbol to fetch bars for.
         :param start: Start date in ISO format (YYYY-MM-DD).
         :param end: End date in ISO format (YYYY-MM-DD).
         :param limit: Maximum number of records to return.
         :return: JSON response containing bar data.
         """
-        params: Dict[str, Any] = {
+        params: dict[str, Any] = {
             "symbols": symbols,
             "timeframe": timeframe,
             "limit": limit,
@@ -110,10 +113,7 @@ class AlpacaMarketDataAPI:
             params["page_token"] = page_token
         return self._request("GET", "/v2/stocks/bars", params=params)
 
-    def get_latest_bars(
-        self,
-        symbols: List[str]
-    ) -> Dict[str, Any]:
+    def get_latest_bars(self, symbols: list[str]) -> dict[str, Any]:
         """
         Fetch the latest bar data for one or more symbols
         (always returns a dict under the "bars" key).
@@ -122,39 +122,35 @@ class AlpacaMarketDataAPI:
         return self._request("GET", "/v2/stocks/bars/latest", params=params)
 
     def get_condition_codes(
-        self,
-        ticktype: Optional[str] = "trade",
-        tape: Optional[str] = "A"
-    ) -> Dict[str, Any]:
+        self, ticktype: str | None = "trade", tape: str | None = "A"
+    ) -> dict[str, Any]:
         """
         Fetch the condition codes used in market data.
-        
+
         :return: JSON response containing condition codes.
         """
-        params = { "tape": tape }
+        params = {"tape": tape}
         return self._request("GET", f"/v2/stocks/meta/conditions/{ticktype}", params=params)
 
-    def get_exchange_codes(
-        self
-    ) -> Dict[str, Any]:
+    def get_exchange_codes(self) -> dict[str, Any]:
         """
         Fetch the exchange codes used in market data.
-        
+
         :return: JSON response containing exchange codes.
         """
         return self._request("GET", "/v2/stocks/meta/exchanges")
 
     def get_historical_quotes(
         self,
-        symbols: List[str],
-        start: Optional[datetime] = None,
-        end: Optional[datetime] = None,
-        limit: Optional[int] = None,
-        feed: Optional[str] = "iex"
-    ) -> Dict[str, Any]:
+        symbols: list[str],
+        start: datetime | None = None,
+        end: datetime | None = None,
+        limit: int | None = None,
+        feed: str | None = "iex",
+    ) -> dict[str, Any]:
         """
         Fetch historical quote data for a given symbol.
-        
+
         :param symbol: The stock symbol to fetch quotes for.
         :param start: Start date in ISO format (YYYY-MM-DD).
         :param end: End date in ISO format (YYYY-MM-DD).
@@ -166,30 +162,24 @@ class AlpacaMarketDataAPI:
             "start": start.strftime("%Y-%m-%dT%H:%M:%SZ") if start else None,
             "end": end.strftime("%Y-%m-%dT%H:%M:%SZ") if end else None,
             "limit": limit,
-            "feed": feed
+            "feed": feed,
         }
         return self._request("GET", "/v2/stocks/quotes", params=params)
 
-    def get_latest_quotes(
-        self,
-        symbol: str
-    ) -> Dict[str, Any]:
+    def get_latest_quotes(self, symbol: str) -> dict[str, Any]:
         """
         Fetch the latest quote data for a given symbol.
-        
+
         :param symbol: The stock symbol to fetch the latest quote for.
         :return: JSON response containing the latest quote data.
         """
         params = {"symbols": symbol}
         return self._request("GET", "/v2/stocks/quotes/latest", params=params)
 
-    def get_snapshots(
-        self,
-        symbols: Optional[str] = None
-    ) -> Dict[str, Any]:
+    def get_snapshots(self, symbols: str | None = None) -> dict[str, Any]:
         """
         Fetch snapshots for one or more symbols.
-        
+
         :param symbols: Comma-separated list of stock symbols.
         :return: JSON response containing snapshot data.
         """
@@ -198,15 +188,15 @@ class AlpacaMarketDataAPI:
 
     def get_historical_trades(
         self,
-        symbols: List[str],
-        start: Optional[datetime] = None,
-        end: Optional[datetime] = None,
-        limit: Optional[int] = None,
-        feed: Optional[str] = "iex"
-    ) -> Dict[str, Any]:
+        symbols: list[str],
+        start: datetime | None = None,
+        end: datetime | None = None,
+        limit: int | None = None,
+        feed: str | None = "iex",
+    ) -> dict[str, Any]:
         """
         Fetch historical trade data for a given symbol.
-        
+
         :param symbol: The stock symbol to fetch trades for.
         :param start: Start date in ISO format (YYYY-MM-DD).
         :param end: End date in ISO format (YYYY-MM-DD).
@@ -218,17 +208,14 @@ class AlpacaMarketDataAPI:
             "start": start.strftime("%Y-%m-%dT%H:%M:%SZ") if start else None,
             "end": end.strftime("%Y-%m-%dT%H:%M:%SZ") if end else None,
             "limit": limit,
-            "feed": feed
+            "feed": feed,
         }
         return self._request("GET", "/v2/stocks/trades", params=params)
 
-    def get_latest_trades(
-        self,
-        symbol: str
-    ) -> Dict[str, Any]:
+    def get_latest_trades(self, symbol: str) -> dict[str, Any]:
         """
         Fetch the latest trade data for a given symbol.
-        
+
         :param symbol: The stock symbol to fetch the latest trade for.
         :return: JSON response containing the latest trade data.
         """
@@ -237,12 +224,12 @@ class AlpacaMarketDataAPI:
 
     def get_most_active_stocks(
         self,
-        by: Optional[str] = "volume",
-        top: Optional[int] = 10,
-    ) -> Dict[str, Any]:
+        by: str | None = "volume",
+        top: int | None = 10,
+    ) -> dict[str, Any]:
         """
         Fetch the most active stocks.
-        
+
         :param limit: Maximum number of records to return.
         :return: JSON response containing most active stocks data.
         """
@@ -251,11 +238,11 @@ class AlpacaMarketDataAPI:
 
     def get_top_market_movers(
         self,
-        top: Optional[int] = 10,
-    ) -> Dict[str, Any]:
+        top: int | None = 10,
+    ) -> dict[str, Any]:
         """
         Fetch top market movers in a given direction.
-        
+
         :param direction: 'up' for gainers, 'down' for losers.
         :param limit: Maximum number of records to return.
         :return: JSON response containing top market movers data.
@@ -266,14 +253,14 @@ class AlpacaMarketDataAPI:
     def crypto_get_historical_bars(
         self,
         loc: str,
-        symbols: List[str],
+        symbols: list[str],
         timeframe: str,
-        start: Optional[datetime] = None,
-        end: Optional[datetime] = None,
-        limit: Optional[int] = 1000,
-        page_token: Optional[str] = None,
+        start: datetime | None = None,
+        end: datetime | None = None,
+        limit: int | None = 1000,
+        page_token: str | None = None,
         sort: str = "asc",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Fetch historical crypto bars from Alpaca v1beta3.
 
@@ -288,15 +275,14 @@ class AlpacaMarketDataAPI:
         :return: JSON response with "bars" and optional "next_page_token".
         """
         if sort not in ("asc", "desc"):
-            raise ValueError("sort must be 'asc' or 'desc'")
-        
-        LOWER_LIMIT = 1
-        UPPER_LIMIT = 10000
+            raise InvalidSortParameterError(sort)
 
-        if limit is not None and not (LOWER_LIMIT <= int(limit) <= UPPER_LIMIT):
-            raise ValueError("limit must be between 1 and 10000")
+        if limit is not None and not (
+            CRYPTO_MIN_DATA_POINTS <= int(limit) <= CRYPTO_MAX_DATA_POINTS
+        ):
+            raise InvalidLimitParameterError(int(limit))
 
-        params: Dict[str, Any] = {
+        params: dict[str, Any] = {
             "symbols": ",".join(symbols),
             "timeframe": timeframe,
             "sort": sort,

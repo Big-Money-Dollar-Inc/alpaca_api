@@ -1,0 +1,65 @@
+[project]
+name = "alpacaapi"
+version = "0.1.0"
+description = "This is a python module to interact with the alpaca APIs"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "msgpack>=1.1.2",
+    "requests>=2.32.5",
+    "ruff>=0.14.10",
+    "websocket-client>=1.9.0",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+respect-gitignore = true
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "auto"
+
+[tool.ruff.lint]
+# A practical “safe + clean” baseline:
+select = [
+  "E", "F", "W",        # pycodestyle + pyflakes
+  "I",                  # isort
+  "UP",                 # pyupgrade
+  "B",                  # flake8-bugbear
+  "SIM",                # flake8-simplify
+  "C4",                 # flake8-comprehensions
+  "RUF",                # Ruff-specific rules
+  "N",                  # pep8-naming
+  "PL",                 # pylint-derived rules (incl. PLR2004)
+  "TRY",                # better exception handling patterns
+]
+
+# Keep signal high. You can tighten later.
+ignore = [
+  "E501",     # line length handled by formatter
+  "PLR0913",  # too many arguments (often noisy)
+  "PLR0912",  # too many branches (sometimes noisy)
+  "PLR0915",  # too many statements (sometimes noisy)
+]
+
+fixable = ["ALL"]
+unfixable = []
+preview = false
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**.py" = ["PLR2004"]   # tests often compare against literals intentionally
+
+[tool.ruff.lint.pylint]
+# Enforce “no magic numbers in comparisons”:
+# This is the Ruff rule you want.
+# It ignores some common values by design (0, 1, "", "__main__", etc).
+# You cannot currently allowlist specific extra numeric values, only types.
+# If you want stricter, keep this empty or remove it.
+allow-magic-value-types = ["str", "bytes"]
+
+[dependency-groups]
+dev = [
+    "pre-commit>=4.5.1",
+]
