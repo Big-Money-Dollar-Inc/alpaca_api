@@ -9,6 +9,7 @@ from alpaca_api_exceptions import (
     InvalidSortParameterError,
     JsonResponseError,
 )
+from alpaca_market_data_classes import Auction, HistoricalAuctions
 
 OK_RESPONSE_CODE = 200
 CRYPTO_MIN_DATA_POINTS = 1
@@ -47,7 +48,9 @@ class AlpacaMarketDataAPI:
         resp = self.session.request(method, url, **kwargs)
 
         if resp.status_code != OK_RESPONSE_CODE:
-            raise AlpacaAPIReturnCodeError(resp.status_code)
+            print(url + str(kwargs))
+            print(resp)
+            raise AlpacaAPIReturnCodeError(resp.status_code, resp.text)
 
         try:
             resp.json()
@@ -58,11 +61,11 @@ class AlpacaMarketDataAPI:
 
     def get_historical_auctions(
         self,
-        symbols: str | None = None,
+        symbols: list[str | None],
         start: datetime | None = None,
         end: datetime | None = None,
         limit: int | None = None,
-    ) -> dict[str, Any]:
+    ) -> HistoricalAuctions:
         """
         Fetch historical auction data for a given symbol.
 
@@ -78,7 +81,25 @@ class AlpacaMarketDataAPI:
             "end": end.strftime("%Y-%m-%dT%H:%M:%SZ") if end else None,
             "limit": limit,
         }
-        return self._request("GET", "/v2/stocks/auctions", params=params)
+
+        data = self._request("GET", "/v2/stocks/auctions", params=params)
+
+        try:
+            auctions = list[Auction](data.get("auctions", {}))
+
+            print(auctions)
+
+            # auction_dict = AuctionsDict(opening_auctions=)
+
+            return HistoricalAuctions(
+                datetime=data.get("datetime"),
+                auctions=data.get("auctions"),
+                currency=data.get("currency"),
+                next_page_token=data["next_page_token"],
+            )
+        except TypeError as e:
+            print(data)
+            raise JsonResponseError from e
 
     def get_historical_bars(
         self,

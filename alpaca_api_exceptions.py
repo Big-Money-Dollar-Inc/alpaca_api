@@ -41,20 +41,32 @@ class InsufficientCryptoQuantityError(ValueError):
 # Response Code Exceptions
 # Exception raised when a response is not 200 OK
 class AlpacaAPIReturnCodeError(Exception):
-    def __init__(self, status_code: int):
+    def __init__(self, status_code: int, message_body: str = ""):
         message = ""
         match status_code:
             case 400:
-                message = "One of the request parameters is invalid. See the returned message for details."
+                message = (
+                    "One of the request parameters is invalid. See the returned message for details.\n "
+                    + message_body
+                )
             case 401:
-                message = "Authentication headers are missing or invalid. Make sure you authenticate your request with a valid API key."
+                message = (
+                    "Authentication headers are missing or invalid. Make sure you authenticate your request with a valid API key.\n "
+                    + message_body
+                )
             case 403:
-                message = "The requested resource is forbidden."
+                message = "The requested resource is forbidden.\n " + message_body
             case 429:
-                message = "Too many requests. You hit the rate limit. Use the X-RateLimit-... response headers to make sure you're under the rate limit."
+                message = (
+                    "Too many requests. You hit the rate limit. Use the X-RateLimit-... response headers to make sure you're under the rate limit.\n "
+                    + message_body
+                )
             case 500:
-                message = "Internal server error. We recommend retrying these later. If the issue persists, please contact us on https://forum.alpaca.markets/"
+                message = (
+                    "Internal server error. We recommend retrying these later. If the issue persists, please contact us on https://forum.alpaca.markets/\n "
+                    + message_body
+                )
             case _:
-                message = f"Received non-OK response: {status_code}"
+                message = f"Received non-OK response: {status_code}\n " + message_body
 
         super().__init__(f"{message}")

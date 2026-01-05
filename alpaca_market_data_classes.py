@@ -16,7 +16,7 @@ class Bar:
 
 
 @dataclass
-class Auctions:
+class Auction:
     datetime: datetime
     exchange_code: str
     auction_price: float
@@ -25,19 +25,19 @@ class Auctions:
 
 
 class AuctionsDict(TypedDict):
-    opening_auctions: list[Auctions]
-    closing_auctions: list[Auctions]
+    opening_auctions: list[Auction]
+    closing_auctions: list[Auction]
 
 
 @dataclass
 class HistoricalAuctions:
-    datetime: datetime
-    auctions: dict[str, AuctionsDict]
-    currency: str
-    next_page_token: str | None
+    datetime: datetime | None = None
+    auctions: dict[str, AuctionsDict] | None = None
+    currency: str | None = None
+    next_page_token: str | None = None
 
 
-# Latest Auctions response class
+# Latest Auction response class
 @dataclass
 class HistoricalBars:
     bars: dict[str, list[Bar]]
