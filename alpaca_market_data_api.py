@@ -4,10 +4,10 @@ from typing import Any
 from requests import Session
 
 from alpaca_api_exceptions import (
+    AlpacaAPIReturnCodeError,
     InvalidLimitParameterError,
     InvalidSortParameterError,
     JsonResponseError,
-    NonOkResponseError,
 )
 
 OK_RESPONSE_CODE = 200
@@ -47,7 +47,7 @@ class AlpacaMarketDataAPI:
         resp = self.session.request(method, url, **kwargs)
 
         if resp.status_code != OK_RESPONSE_CODE:
-            raise NonOkResponseError(resp.status_code)
+            raise AlpacaAPIReturnCodeError(resp.status_code)
 
         try:
             resp.json()
