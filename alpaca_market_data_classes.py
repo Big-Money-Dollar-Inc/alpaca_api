@@ -41,7 +41,7 @@ class HistoricalAuctions:
 @dataclass
 class HistoricalBars:
     bars: dict[str, list[Bar]]
-    currency: str
+    currency: str | None
     next_page_token: str | None
 
 
@@ -49,7 +49,7 @@ class HistoricalBars:
 @dataclass
 class LatestBars:
     bars: dict[str, list[Bar]]
-    currency: str
+    currency: str | None
 
 
 # Condition Codes class
@@ -81,7 +81,7 @@ class Quote:
 @dataclass
 class HistoricalQuotes:
     quotes: dict[str, list[Quote]]
-    currency: str
+    currency: str | None
     next_page_token: str | None
 
 
@@ -89,7 +89,7 @@ class HistoricalQuotes:
 @dataclass
 class LatestQuotes:
     quotes: dict[str, list[Quote]]
-    currency: str
+    currency: str | None
 
 
 @dataclass
@@ -121,7 +121,7 @@ class Snapshots:
 @dataclass
 class HistoricalTrades:
     trades: dict[str, list[Trade]]
-    currency: str
+    currency: str | None
     next_page_token: str | None
 
 
@@ -140,8 +140,8 @@ class MostActiveStock:
 
 @dataclass
 class MostActiveStocks:
-    most_active_stocks: dict[str, MostActiveStock]
-    last_updated: datetime
+    most_active_stocks: list[MostActiveStock]
+    last_updated: datetime | None
 
 
 @dataclass
@@ -154,7 +154,7 @@ class Mover:
 
 @dataclass
 class TopMarketMovers:
-    gainers: dict[str, Mover]
-    losers: dict[str, Mover]
-    market_type: str
-    last_updated: datetime
+    gainers: list[Mover]
+    losers: list[Mover]
+    market_type: str | None
+    last_updated: datetime | None

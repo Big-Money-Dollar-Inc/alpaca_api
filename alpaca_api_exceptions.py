@@ -38,6 +38,13 @@ class InsufficientCryptoQuantityError(ValueError):
         super().__init__(f"Crypto orders require qty >= {min_qty}")
 
 
+class InvalidAlpacaPayloadError(TypeError):
+    """Exception raised when the Alpaca API payload received an invalid type."""
+
+    def __init__(self, message: str = "Invalid payload received from Alpaca API"):
+        super().__init__(message)
+
+
 # Response Code Exceptions
 # Exception raised when a response is not 200 OK
 class AlpacaAPIReturnCodeError(Exception):

@@ -31,52 +31,141 @@ def test_get_historical_auctions():
     pprint(data)
 
 
-test_get_historical_auctions()
+# test_get_historical_auctions()
 
 
 def test_get_historical_bars():
-    pass
+    data = market_data.get_historical_bars(
+        symbols=["AAPL"],
+        limit=10,
+        start=datetime.now() - timedelta(days=7),
+        end=datetime.now() - timedelta(days=1),
+    )
+
+    # Nicely formatted json data printout
+    pprint(data)
+
+
+# test_get_historical_bars()
 
 
 def test_get_latest_bars():
-    pass
+    data = market_data.get_latest_bars(
+        symbols=["AAPL"],
+    )
+
+    # Nicely formatted json data printout
+    pprint(data)
+
+
+# test_get_latest_bars()
 
 
 def test_get_condition_codes():
-    pass
+    data = market_data.get_condition_codes()
+
+    # Nicely formatted json data printout
+    pprint(data)
+
+
+# test_get_condition_codes()
 
 
 def test_get_exchange_codes():
-    pass
+    data = market_data.get_exchange_codes()
+
+    # Nicely formatted json data printout
+    pprint(data)
+
+
+# test_get_exchange_codes()
 
 
 def test_get_historical_quotes():
-    pass
+    data = market_data.get_historical_quotes(
+        symbols=["AAPL"],
+        limit=10,
+        start=datetime.now() - timedelta(days=7),
+        end=datetime.now() - timedelta(days=1),
+    )
+
+    # Nicely formatted json data printout
+    pprint(data)
+
+
+# test_get_historical_quotes()
 
 
 def test_get_latest_quotes():
-    pass
+    data = market_data.get_latest_quotes(symbols=["AAPL"])
+
+    # Nicely formatted json data printout
+    pprint(data)
+
+
+# test_get_latest_quotes()
 
 
 def test_get_snapshots():
-    pass
+    data = market_data.get_snapshots(symbols=["AAPL"])
+
+    # Nicely formatted json data printout
+    pprint(data)
+
+
+# test_get_snapshots()
 
 
 def test_get_historical_trades():
-    pass
+    data = market_data.get_historical_trades(
+        symbols=["AAPL"],
+        limit=10,
+        start=datetime.now() - timedelta(days=7),
+        end=datetime.now() - timedelta(days=1),
+    )
+
+    # Nicely formatted json data printout
+    pprint(data)
+
+
+# test_get_historical_trades()
 
 
 def test_get_latest_trades():
-    pass
+    data = market_data.get_latest_trades(symbols=["AAPL"])
+
+    # Nicely formatted json data printout
+    pprint(data)
+
+
+# test_get_latest_trades()
 
 
 def test_get_most_active_stocks():
-    pass
+    data = market_data.get_most_active_stocks()
+
+    # Nicely formatted json data printout
+    pprint(data)
+
+
+# test_get_most_active_stocks()
 
 
 def test_get_top_market_movers():
-    pass
+    data = market_data.get_top_market_movers()
+
+    # Nicely formatted json data printout
+    pprint(data)
+
+
+# test_get_top_market_movers()
 
 
 def test_crypto_get_historical_bars():
-    pass
+    data = market_data.crypto_get_historical_bars(loc="us", symbols=["BTC/USD"], timeframe="1Min")
+
+    # Nicely formatted json data printout
+    pprint(data)
+
+
+# test_crypto_get_historical_bars()
