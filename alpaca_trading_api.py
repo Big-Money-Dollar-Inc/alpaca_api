@@ -1,8 +1,9 @@
-from typing import Any
+from typing import Any, cast
 
 from requests import Session
 
 from alpaca_api_exceptions import InsufficientCryptoQuantityError, InvalidQuantityError
+from alpaca_trading_api_classes import Asset, GetAccountResponse, GetAssetsResponse
 
 CRYPTO_MIN_ORDER_QTY = 0.0001
 
@@ -46,24 +47,50 @@ class AlpacaTradingAPI:
         resp = self.session.request(method, url, **kwargs)
         return resp.json()
 
-    def get_account(self) -> dict[str, Any]:
+    def get_account(self) -> GetAccountResponse:
         """Fetch your account information."""
-        return self._request("GET", "/v2/account")
+
+        data = self._request("GET", "/v2/account")
+
+        allowed = set(GetAccountResponse.__annotations__.keys())
+
+        payload = {k: v for k, v in data.items() if k in allowed}
+
+        return GetAccountResponse(**payload)
 
     def get_assets(
         self, status: str | None = None, asset_class: str | None = None, exchange: str | None = None
-    ) -> dict[str, Any]:
+    ) -> GetAssetsResponse:
         """List all assets, optionally filtered by status/class/exchange."""
         params = {
             k: v
             for k, v in {"status": status, "asset_class": asset_class, "exchange": exchange}.items()
             if v is not None
         }
-        return self._request("GET", "/v2/assets", params=params)
+        data = self._request("GET", "/v2/assets", params=params)
 
-    def get_asset(self, symbol: str) -> dict[str, Any]:
+        rows = cast(list[dict[str, Any]], data)
+
+        assets: list[Asset] = []
+        asset_fields = set(Asset.__annotations__.keys())
+
+        for row in rows:
+            payload = {k: row.get(k) for k in asset_fields}
+            assets.append(Asset(**payload))
+
+        return GetAssetsResponse(assets=assets)
+
+    def get_asset(self, symbol: str) -> Asset:
         """Fetch a single asset by symbol or asset ID."""
-        return self._request("GET", f"/v2/assets/{symbol}")
+        data = self._request("GET", f"/v2/assets/{symbol}")
+
+        allowed = set(Asset.__annotations__.keys())
+
+        payload = {k: v for k, v in data.items() if k in allowed}
+
+        payload["asset_class"] = data.get("class")
+
+        return Asset(**payload)
 
     def get_option_contracts(self) -> dict[str, Any]:
         """
