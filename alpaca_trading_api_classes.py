@@ -102,19 +102,19 @@ class GetAssetsResponse:
 
 @dataclass
 class Order:
-    id: str
-    client_order_id: str
-    asset_id: str
-    symbol: str
-    asset_class: str
-    filled_qty: str
-    order_class: str
-    time_in_force: str
-    type: str
-    status: str
-    extended_hours: bool
+    id: str | None
+    client_order_id: str | None
+    asset_id: str | None
+    symbol: str | None
+    asset_class: str | None
+    filled_qty: str | None
+    order_class: str | None
+    time_in_force: str | None
+    type: str | None
+    status: str | None
+    extended_hours: bool | None
 
-    created_at: str
+    created_at: str | None
     updated_at: str | None = None
     submitted_at: str | None = None
     filled_at: str | None = None
@@ -154,13 +154,13 @@ class AllOrdersResponse:
 
 @dataclass
 class DeleteOrderResponse:
-    id: str
-    status: int
+    id: str | None
+    status: int | None
 
 
 @dataclass
 class DeleteAllOrdersResponse:
-    list[DeleteOrderResponse]
+    DeletedOrders: list[DeleteOrderResponse] | None
 
 
 @dataclass

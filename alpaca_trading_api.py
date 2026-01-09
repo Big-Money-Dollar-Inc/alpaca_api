@@ -3,7 +3,15 @@ from typing import Any, cast
 from requests import Session
 
 from alpaca_api_exceptions import InsufficientCryptoQuantityError, InvalidQuantityError
-from alpaca_trading_api_classes import Asset, GetAccountResponse, GetAssetsResponse
+from alpaca_trading_api_classes import (
+    AllOrdersResponse,
+    Asset,
+    DeleteAllOrdersResponse,
+    DeleteOrderResponse,
+    GetAccountResponse,
+    GetAssetsResponse,
+    Order,
+)
 
 CRYPTO_MIN_ORDER_QTY = 0.0001
 
@@ -170,7 +178,7 @@ class AlpacaTradingAPI:
         stop_loss: dict[str, float] | None = None,
         asset: str = "stocks",
         **kwargs: Any,
-    ) -> dict[str, Any]:
+    ) -> Order:
         """
         Create a new order.
         """
@@ -195,7 +203,16 @@ class AlpacaTradingAPI:
         }
         if cleaned_qty is None:
             data.pop("qty", None)
-        return self._request("POST", "/v2/orders", json=data)
+
+        data = self._request("POST", "/v2/orders", json=data)
+
+        allowed = set(Order.__annotations__.keys())
+
+        payload = {k: v for k, v in data.items() if k in allowed}
+
+        payload["asset_class"] = data.get("class")
+
+        return Order(**payload)
 
     def get_all_orders(
         self,
@@ -207,7 +224,7 @@ class AlpacaTradingAPI:
         nested: bool = False,
         symbol: str | None = None,
         side: str | None = None,
-    ) -> dict[str, Any]:
+    ) -> AllOrdersResponse:
         """
         List all orders, optionally filtered by status, symbol, side, etc.
         """
@@ -221,13 +238,35 @@ class AlpacaTradingAPI:
             "symbol": symbol,
             "side": side,
         }
-        return self._request("GET", "/v2/orders", params=params)
+        data = self._request("GET", "/v2/orders", params=params)
 
-    def delete_all_orders(self) -> dict[str, Any]:
+        rows = cast(list[dict[str, Any]], data)
+
+        orders: list[Order] = []
+        order_fields = set(Order.__annotations__.keys())
+
+        for row in rows:
+            payload = {k: row.get(k) for k in order_fields}
+            orders.append(Order(**payload))
+
+        return AllOrdersResponse(orders=orders)
+
+    def delete_all_orders(self) -> DeleteAllOrdersResponse:
         """
         Cancel all open orders.
         """
-        return self._request("DELETE", "/v2/orders")
+        data = self._request("DELETE", "/v2/orders")
+
+        rows = cast(list[dict[str, Any]], data)
+
+        orders: list[DeleteOrderResponse] = []
+        order_fields = set(DeleteOrderResponse.__annotations__.keys())
+
+        for row in rows:
+            payload = {k: row.get(k) for k in order_fields}
+            orders.append(DeleteOrderResponse(**payload))
+
+        return DeleteAllOrdersResponse(DeletedOrders=orders)
 
     def get_order_by_client_order_id(self, client_order_id: str) -> dict[str, Any]:
         """

@@ -42,4 +42,34 @@ def test_get_asset():
     pprint(data)
 
 
-test_get_asset()
+# test_get_asset()
+
+
+def test_create_order():
+    data = market_data.create_order(symbol="AAPL", side="buy", qty=2)
+
+    # Nicely formatted json data printout
+    pprint(data)
+
+
+# test_create_order()
+
+
+def test_get_all_orders():
+    data = market_data.get_all_orders()
+
+    # Nicely formatted json data printout
+    pprint(data)
+
+
+# test_get_all_orders()
+
+
+def test_delete_all_orders():
+    data = market_data.delete_all_orders()
+
+    # Nicely formatted json data printout
+    pprint(data)
+
+
+# test_delete_all_orders()
