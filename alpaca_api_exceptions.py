@@ -45,35 +45,73 @@ class InvalidAlpacaPayloadError(TypeError):
         super().__init__(message)
 
 
-# Response Code Exceptions
-# Exception raised when a response is not 200 OK
-class AlpacaAPIReturnCodeError(Exception):
-    def __init__(self, status_code: int, message_body: str = ""):
-        message = ""
-        match status_code:
-            case 400:
-                message = (
-                    "One of the request parameters is invalid. See the returned message for details.\n "
-                    + message_body
-                )
-            case 401:
-                message = (
-                    "Authentication headers are missing or invalid. Make sure you authenticate your request with a valid API key.\n "
-                    + message_body
-                )
-            case 403:
-                message = "The requested resource is forbidden.\n " + message_body
-            case 429:
-                message = (
-                    "Too many requests. You hit the rate limit. Use the X-RateLimit-... response headers to make sure you're under the rate limit.\n "
-                    + message_body
-                )
-            case 500:
-                message = (
-                    "Internal server error. We recommend retrying these later. If the issue persists, please contact us on https://forum.alpaca.markets/\n "
-                    + message_body
-                )
-            case _:
-                message = f"Received non-OK response: {status_code}\n " + message_body
+class AlpacaAPIError(Exception):
+    status_code: int
 
-        super().__init__(f"{message}")
+    def __init__(self, message: str, message_body: str = ""):
+        full_message = f"{message}\n{message_body}" if message_body else message
+        super().__init__(full_message)
+
+
+class BadRequestError(AlpacaAPIError):
+    status_code = 400
+
+    def __init__(self, message_body: str = ""):
+        super().__init__(
+            "One of the request parameters is invalid. See the returned message for details.",
+            message_body,
+        )
+
+
+class UnauthorizedError(AlpacaAPIError):
+    status_code = 401
+
+    def __init__(self, message_body: str = ""):
+        super().__init__(
+            "Authentication headers are missing or invalid. Make sure you authenticate your request with a valid API key.",
+            message_body,
+        )
+
+
+class ForbiddenError(AlpacaAPIError):
+    status_code = 403
+
+    def __init__(self, message_body: str = ""):
+        super().__init__("The requested resource is forbidden.", message_body)
+
+
+class UnprocessableEntityError(AlpacaAPIError):
+    status_code = 422
+
+    def __init__(self, message_body: str = ""):
+        super().__init__("The order status is not cancelable.", message_body)
+
+
+class RateLimitError(AlpacaAPIError):
+    status_code = 429
+
+    def __init__(self, message_body: str = ""):
+        super().__init__(
+            "Too many requests. You hit the rate limit. Use the X-RateLimit headers to stay under the limit.",
+            message_body,
+        )
+
+
+class InternalServerError(AlpacaAPIError):
+    status_code = 500
+
+    def __init__(self, message_body: str = ""):
+        super().__init__(
+            "Internal server error. Retry later. If the issue persists, contact https://forum.alpaca.markets/",
+            message_body,
+        )
+
+
+class UnknownError(AlpacaAPIError):
+    status_code = 000
+
+    def __init__(self, message_body: str = ""):
+        super().__init__(
+            "Unknown error, please add this to alpaca_api_exceptions.py and alpaca_api_request_handler.py and push your changes.",
+            message_body,
+        )

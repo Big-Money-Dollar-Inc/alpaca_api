@@ -17,6 +17,17 @@ dependencies = [
 line-length = 100
 target-version = "py312"
 respect-gitignore = true
+select = [
+  "ANN",   # Type annotation enforcement
+  "TCH",   # Type-checking imports
+  "PGH",   # Pygrep hooks
+  "RUF",   # Ruff-specific rules
+]
+
+ignore = [
+  "ANN101",  # Allow missing type for self
+  "ANN102",  # Allow missing type for cls
+]
 
 [tool.ruff.format]
 quote-style = "double"

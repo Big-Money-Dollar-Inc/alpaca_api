@@ -5,12 +5,12 @@ from typing import Any
 from requests import Session
 
 from alpaca_api_exceptions import (
-    AlpacaAPIReturnCodeError,
     InvalidAlpacaPayloadError,
     InvalidLimitParameterError,
     InvalidSortParameterError,
     JsonResponseError,
 )
+from alpaca_api_request_handler import alpaca_api_request
 from alpaca_market_data_classes import (
     Auction,
     Bar,
@@ -63,22 +63,6 @@ class AlpacaMarketDataAPI:
             "APCA-API-SECRET-KEY": api_secret,
             "Content-Type": "application/json",
         }
-
-    def _request(self, method: str, path: str, **kwargs: Any) -> dict[str, Any]:
-        url = f"{self.base_url}{path}"
-        resp = self.session.request(method, url, **kwargs)
-
-        if resp.status_code != OK_RESPONSE_CODE:
-            print(url + str(kwargs))
-            print(resp)
-            raise AlpacaAPIReturnCodeError(resp.status_code, resp.text)
-
-        try:
-            resp.json()
-        except Exception:
-            raise JsonResponseError() from None
-
-        return resp.json()
 
     def _parse_ts(self, value: Any) -> datetime:
         if not isinstance(value, str):
@@ -137,7 +121,13 @@ class AlpacaMarketDataAPI:
             "limit": limit,
         }
 
-        data = self._request("GET", "/v2/stocks/auctions", params=params)
+        data = alpaca_api_request(
+            base_url=self.base_url,
+            session=self.session,
+            method="GET",
+            path="/v2/stocks/auctions",
+            params=params,
+        )
 
         try:
             auctions_by_symbol = data.get("auctions") or {}
@@ -220,7 +210,13 @@ class AlpacaMarketDataAPI:
         if page_token:
             params["page_token"] = page_token
 
-        data = self._request("GET", "/v2/stocks/bars", params=params)
+        data = alpaca_api_request(
+            base_url=self.base_url,
+            session=self.session,
+            method="GET",
+            path="/v2/stocks/bars",
+            params=params,
+        )
 
         try:
             bars_by_symbol = data.get("bars") or {}
@@ -252,8 +248,13 @@ class AlpacaMarketDataAPI:
         """
         params = {"symbols": ",".join(symbols)}
 
-        data = self._request("GET", "/v2/stocks/bars/latest", params=params)
-
+        data = alpaca_api_request(
+            base_url=self.base_url,
+            session=self.session,
+            method="GET",
+            path="/v2/stocks/bars/latest",
+            params=params,
+        )
         try:
             bars_by_symbol = data.get("bars") or {}
 
@@ -294,7 +295,13 @@ class AlpacaMarketDataAPI:
         """
         params = {"tape": tape}
 
-        data = self._request("GET", f"/v2/stocks/meta/conditions/{ticktype}", params=params)
+        data = alpaca_api_request(
+            base_url=self.base_url,
+            session=self.session,
+            method="GET",
+            path=f"/v2/stocks/meta/conditions/{ticktype}",
+            params=params,
+        )
 
         try:
             parsed: dict[str, str] = {}
@@ -313,7 +320,12 @@ class AlpacaMarketDataAPI:
 
         :return: JSON response containing exchange codes.
         """
-        data = self._request("GET", "/v2/stocks/meta/exchanges")
+        data = alpaca_api_request(
+            base_url=self.base_url,
+            session=self.session,
+            method="GET",
+            path="/v2/stocks/meta/exchanges",
+        )
 
         try:
             parsed: dict[str, str] = {}
@@ -372,7 +384,13 @@ class AlpacaMarketDataAPI:
             "feed": feed,
         }
 
-        data = self._request("GET", "/v2/stocks/quotes", params=params)
+        data = alpaca_api_request(
+            base_url=self.base_url,
+            session=self.session,
+            method="GET",
+            path="/v2/stocks/quotes",
+            params=params,
+        )
 
         print(data)
 
@@ -407,7 +425,13 @@ class AlpacaMarketDataAPI:
         """
         params = {"symbols": symbols}
 
-        data = self._request("GET", "/v2/stocks/quotes/latest", params=params)
+        data = alpaca_api_request(
+            base_url=self.base_url,
+            session=self.session,
+            method="GET",
+            path="/v2/stocks/quotes/latest",
+            params=params,
+        )
 
         try:
             quotes_by_symbol = data.get("quotes") or {}
@@ -483,7 +507,13 @@ class AlpacaMarketDataAPI:
         """
         params = {"symbols": symbols} if symbols else {}
 
-        data = self._request("GET", "/v2/stocks/snapshots", params=params)
+        data = alpaca_api_request(
+            base_url=self.base_url,
+            session=self.session,
+            method="GET",
+            path="/v2/stocks/snapshots",
+            params=params,
+        )
 
         print(data)
 
@@ -529,7 +559,13 @@ class AlpacaMarketDataAPI:
             "limit": limit,
             "feed": feed,
         }
-        data = self._request("GET", "/v2/stocks/trades", params=params)
+        data = alpaca_api_request(
+            base_url=self.base_url,
+            session=self.session,
+            method="GET",
+            path="/v2/stocks/trades",
+            params=params,
+        )
 
         try:
             trades_by_symbol = data.get("trades") or {}
@@ -562,7 +598,13 @@ class AlpacaMarketDataAPI:
         """
         params = {"symbols": symbols}
 
-        data = self._request("GET", "/v2/stocks/trades/latest", params=params)
+        data = alpaca_api_request(
+            base_url=self.base_url,
+            session=self.session,
+            method="GET",
+            path="/v2/stocks/trades/latest",
+            params=params,
+        )
         try:
             trades_by_symbol = data.get("trades") or {}
 
@@ -597,7 +639,13 @@ class AlpacaMarketDataAPI:
         """
         params = {"by": by, "top": top}
 
-        data = self._request("GET", "/v1beta1/screener/stocks/most-actives", params=params)
+        data = alpaca_api_request(
+            base_url=self.base_url,
+            session=self.session,
+            method="GET",
+            path="/v1beta1/screener/stocks/most-actives",
+            params=params,
+        )
 
         try:
             parsed: dict[str, Any] = {}
@@ -632,7 +680,13 @@ class AlpacaMarketDataAPI:
         """
         params = {"top": top}
 
-        data = self._request("GET", "/v1beta1/screener/stocks/movers", params=params)
+        data = alpaca_api_request(
+            base_url=self.base_url,
+            session=self.session,
+            method="GET",
+            path="/v1beta1/screener/stocks/movers",
+            params=params,
+        )
 
         try:
             return TopMarketMovers(
@@ -728,7 +782,13 @@ class AlpacaMarketDataAPI:
             params["page_token"] = page_token
 
         # Endpoint: /v1beta3/crypto/{loc}/bars
-        data = self._request("GET", f"/v1beta3/crypto/{loc}/bars", params=params)
+        data = alpaca_api_request(
+            base_url=self.base_url,
+            session=self.session,
+            method="GET",
+            path=f"/v1beta3/crypto/{loc}/bars",
+            params=params,
+        )
 
         try:
             bars_by_symbol = data.get("bars") or {}

@@ -1,8 +1,13 @@
+from pprint import pprint
 from typing import Any, cast
 
 from requests import Session
 
-from alpaca_api_exceptions import InsufficientCryptoQuantityError, InvalidQuantityError
+from alpaca_api_exceptions import (
+    InsufficientCryptoQuantityError,
+    InvalidQuantityError,
+)
+from alpaca_api_request_handler import alpaca_api_request
 from alpaca_trading_api_classes import (
     AllOrdersResponse,
     Asset,
@@ -50,15 +55,12 @@ class AlpacaTradingAPI:
             "Content-Type": "application/json",
         }
 
-    def _request(self, method: str, path: str, **kwargs: Any) -> dict[str, Any]:
-        url = f"{self.base_url}{path}"
-        resp = self.session.request(method, url, **kwargs)
-        return resp.json()
-
     def get_account(self) -> GetAccountResponse:
         """Fetch your account information."""
 
-        data = self._request("GET", "/v2/account")
+        data = alpaca_api_request(
+            base_url=self.base_url, session=self.session, method="GET", path="/v2/account"
+        )
 
         allowed = set(GetAccountResponse.__annotations__.keys())
 
@@ -75,7 +77,13 @@ class AlpacaTradingAPI:
             for k, v in {"status": status, "asset_class": asset_class, "exchange": exchange}.items()
             if v is not None
         }
-        data = self._request("GET", "/v2/assets", params=params)
+        data = alpaca_api_request(
+            base_url=self.base_url,
+            session=self.session,
+            method="GET",
+            path="/v2/assets",
+            params=params,
+        )
 
         rows = cast(list[dict[str, Any]], data)
 
@@ -90,7 +98,9 @@ class AlpacaTradingAPI:
 
     def get_asset(self, symbol: str) -> Asset:
         """Fetch a single asset by symbol or asset ID."""
-        data = self._request("GET", f"/v2/assets/{symbol}")
+        data = alpaca_api_request(
+            base_url=self.base_url, session=self.session, method="GET", path=f"/v2/assets/{symbol}"
+        )
 
         allowed = set(Asset.__annotations__.keys())
 
@@ -204,7 +214,13 @@ class AlpacaTradingAPI:
         if cleaned_qty is None:
             data.pop("qty", None)
 
-        data = self._request("POST", "/v2/orders", json=data)
+        data = alpaca_api_request(
+            base_url=self.base_url,
+            session=self.session,
+            method="POST",
+            path="/v2/orders",
+            json=data,
+        )
 
         allowed = set(Order.__annotations__.keys())
 
@@ -238,7 +254,13 @@ class AlpacaTradingAPI:
             "symbol": symbol,
             "side": side,
         }
-        data = self._request("GET", "/v2/orders", params=params)
+        data = alpaca_api_request(
+            base_url=self.base_url,
+            session=self.session,
+            method="GET",
+            path="/v2/orders",
+            params=params,
+        )
 
         rows = cast(list[dict[str, Any]], data)
 
@@ -268,17 +290,40 @@ class AlpacaTradingAPI:
 
         return DeleteAllOrdersResponse(DeletedOrders=orders)
 
-    def get_order_by_client_order_id(self, client_order_id: str) -> dict[str, Any]:
+    def get_order_by_client_order_id(self, client_order_id: str) -> Order:
         """
         Fetch an order by client order ID.
         """
-        return self._request("GET", f"/v2/orders/by_client_order_id/{client_order_id}")
+        data = self._request(
+            "GET", f"/v2/orders:by_client_order_id?client_order_id={client_order_id}"
+        )
 
-    def get_order_by_id(self, order_id: str) -> dict[str, Any]:
+        allowed = set(Order.__annotations__.keys())
+
+        payload = {k: v for k, v in data.items() if k in allowed}
+
+        payload["asset_class"] = data.get("class")
+
+        return Order(**payload)
+
+    def get_order_by_id(self, order_id: str) -> Order:
         """
         Fetch an order by its ID.
         """
-        return self._request("GET", f"/v2/orders/{order_id}")
+        data = alpaca_api_request(
+            base_url=self.base_url,
+            session=self.session,
+            method="GET",
+            path=f"/v2/orders/{order_id}",
+        )
+
+        allowed = set(Order.__annotations__.keys())
+
+        payload = {k: v for k, v in data.items() if k in allowed}
+
+        payload["asset_class"] = data.get("class")
+
+        return Order(**payload)
 
     def replace_order_by_id(
         self,
@@ -289,7 +334,7 @@ class AlpacaTradingAPI:
         stop_price: float | None = None,
         trail_price: float | None = None,
         client_order_id: str | None = None,
-    ) -> dict[str, Any]:
+    ) -> Order:
         """
         Replace an existing order by its ID.
         """
@@ -301,13 +346,38 @@ class AlpacaTradingAPI:
             "trail_price": trail_price,
             "client_order_id": client_order_id,
         }
-        return self._request("PATCH", f"/v2/orders/{order_id}", json=data)
 
-    def cancel_order_by_id(self, order_id: str) -> dict[str, Any]:
+        data = alpaca_api_request(
+            base_url=self.base_url,
+            session=self.session,
+            method="PATCH",
+            path=f"/v2/orders/{order_id}",
+            json=data,
+        )
+
+        pprint(data)
+
+        allowed = set(Order.__annotations__.keys())
+
+        payload = {k: v for k, v in data.items() if k in allowed}
+
+        payload["asset_class"] = data.get("class")
+
+        return Order(**payload)
+
+    def cancel_order_by_id(self, order_id: str) -> None:
         """
         Cancel an order by its ID.
+
+        This api call doesn't return anything, but errors if the order can't be cancelled.
         """
-        return self._request("DELETE", f"/v2/orders/{order_id}")
+
+        alpaca_api_request(
+            base_url=self.base_url,
+            session=self.session,
+            method="DELETE",
+            path=f"/v2/orders/{order_id}",
+        )
 
     def get_all_positions(self) -> dict[str, Any]:
         """
