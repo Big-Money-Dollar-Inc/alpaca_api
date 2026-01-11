@@ -10,7 +10,7 @@ from alpaca_api_exceptions import (
     InvalidSortParameterError,
     JsonResponseError,
 )
-from alpaca_api_request_handler import alpaca_api_request
+from alpaca_api_request_handler import RequestOptions, alpaca_api_request
 from alpaca_market_data_classes import (
     Auction,
     Bar,
@@ -42,7 +42,9 @@ class AlpacaMarketDataAPI:
     Alpaca REST Client for accessing Alpaca's market data API.
     """
 
-    def __init__(self, api_key: str, api_secret: str, request_session: Session | None = None):
+    def __init__(
+        self, api_key: str, api_secret: str, request_session: Session | None = None
+    ) -> None:
         """
         :param api_key: Your Alpaca API key ID.
         :param api_secret: Your Alpaca API secret.
@@ -64,7 +66,7 @@ class AlpacaMarketDataAPI:
             "Content-Type": "application/json",
         }
 
-    def _parse_ts(self, value: Any) -> datetime:
+    def _parse_ts(self, value: str) -> datetime:
         if not isinstance(value, str):
             raise InvalidAlpacaPayloadError
         return datetime.fromisoformat(value.replace("Z", "+00:00"))
@@ -90,7 +92,7 @@ class AlpacaMarketDataAPI:
             return int(v)
         raise InvalidAlpacaPayloadError
 
-    def _parse_auction_list(self, raw: list[dict[str, Any]] | None) -> list[Auction]:
+    def _parse_auction_list(self, raw: list[dict[str, str | float]] | None) -> list[Auction]:
         if not raw:
             return []
 
@@ -98,7 +100,7 @@ class AlpacaMarketDataAPI:
         for a in raw:
             out.append(
                 Auction(
-                    datetime=self._parse_ts(a.get("t")),
+                    datetime=self._parse_ts(self._req_str(a, "t")),
                     exchange_code=self._req_str(a, "x"),
                     auction_price=self._req_float(a, "p"),
                     auction_trade_size=self._req_int(a, "s"),
@@ -126,7 +128,7 @@ class AlpacaMarketDataAPI:
             session=self.session,
             method="GET",
             path="/v2/stocks/auctions",
-            params=params,
+            options=RequestOptions(params=params),
         )
 
         try:
@@ -166,7 +168,7 @@ class AlpacaMarketDataAPI:
         for b in raw:
             out.append(
                 {
-                    "timestamp": self._parse_ts(b.get("t")),
+                    "timestamp": self._parse_ts(self._req_str(b, "t")),
                     "open": self._req_float(b, "o"),
                     "high": self._req_float(b, "h"),
                     "low": self._req_float(b, "l"),
@@ -215,7 +217,7 @@ class AlpacaMarketDataAPI:
             session=self.session,
             method="GET",
             path="/v2/stocks/bars",
-            params=params,
+            options=RequestOptions(params=params),
         )
 
         try:
@@ -253,7 +255,7 @@ class AlpacaMarketDataAPI:
             session=self.session,
             method="GET",
             path="/v2/stocks/bars/latest",
-            params=params,
+            options=RequestOptions(params=params),
         )
         try:
             bars_by_symbol = data.get("bars") or {}
@@ -300,7 +302,7 @@ class AlpacaMarketDataAPI:
             session=self.session,
             method="GET",
             path=f"/v2/stocks/meta/conditions/{ticktype}",
-            params=params,
+            options=RequestOptions(params=params),
         )
 
         try:
@@ -348,7 +350,7 @@ class AlpacaMarketDataAPI:
         for q in raw:
             out.append(
                 {
-                    "timestamp": self._parse_ts(q.get("t")),
+                    "timestamp": self._parse_ts(self._req_str(q, "t")),
                     "bid_exchange": self._req_str(q, "bx"),
                     "bid_price": self._req_float(q, "bp"),
                     "bid_size": self._req_int(q, "bs"),
@@ -389,7 +391,7 @@ class AlpacaMarketDataAPI:
             session=self.session,
             method="GET",
             path="/v2/stocks/quotes",
-            params=params,
+            options=RequestOptions(params=params),
         )
 
         print(data)
@@ -430,7 +432,7 @@ class AlpacaMarketDataAPI:
             session=self.session,
             method="GET",
             path="/v2/stocks/quotes/latest",
-            params=params,
+            options=RequestOptions(params=params),
         )
 
         try:
@@ -464,7 +466,7 @@ class AlpacaMarketDataAPI:
 
     def _parse_bar(self, raw: dict[str, Any]) -> Bar:
         return Bar(
-            datetime=self._parse_ts(raw.get("t")),
+            datetime=self._parse_ts(self._req_str(raw, "t")),
             open=self._req_float(raw, "o"),
             high=self._req_float(raw, "h"),
             low=self._req_float(raw, "l"),
@@ -476,7 +478,7 @@ class AlpacaMarketDataAPI:
 
     def _parse_quote(self, raw: dict[str, Any]) -> Quote:
         return Quote(
-            datetime=self._parse_ts(raw.get("t")),
+            datetime=self._parse_ts(self._req_str(raw, "t")),
             bid_exchange=self._req_str(raw, "bx"),
             bid_price=self._req_float(raw, "bp"),
             bid_size=self._req_int(raw, "bs"),
@@ -488,7 +490,7 @@ class AlpacaMarketDataAPI:
 
     def _parse_trade(self, raw: dict[str, Any]) -> Trade:
         return Trade(
-            datetime=self._parse_ts(raw.get("t")),
+            datetime=self._parse_ts(self._req_str(raw, "t")),
             exchange=self._req_str(raw, "x"),
             price=self._req_float(raw, "p"),
             size=self._req_int(raw, "s"),
@@ -512,7 +514,7 @@ class AlpacaMarketDataAPI:
             session=self.session,
             method="GET",
             path="/v2/stocks/snapshots",
-            params=params,
+            options=RequestOptions(params=params),
         )
 
         print(data)
@@ -564,7 +566,7 @@ class AlpacaMarketDataAPI:
             session=self.session,
             method="GET",
             path="/v2/stocks/trades",
-            params=params,
+            options=RequestOptions(params=params),
         )
 
         try:
@@ -603,7 +605,7 @@ class AlpacaMarketDataAPI:
             session=self.session,
             method="GET",
             path="/v2/stocks/trades/latest",
-            params=params,
+            options=RequestOptions(params=params),
         )
         try:
             trades_by_symbol = data.get("trades") or {}
@@ -644,7 +646,7 @@ class AlpacaMarketDataAPI:
             session=self.session,
             method="GET",
             path="/v1beta1/screener/stocks/most-actives",
-            params=params,
+            options=RequestOptions(params=params),
         )
 
         try:
@@ -685,7 +687,7 @@ class AlpacaMarketDataAPI:
             session=self.session,
             method="GET",
             path="/v1beta1/screener/stocks/movers",
-            params=params,
+            options=RequestOptions(params=params),
         )
 
         try:
@@ -723,7 +725,7 @@ class AlpacaMarketDataAPI:
         for b in raw:
             out.append(
                 {
-                    "timestamp": self._parse_ts(b.get("t")),
+                    "timestamp": self._parse_ts(self._req_str(b, "t")),
                     "open": self._req_float(b, "o"),
                     "high": self._req_float(b, "h"),
                     "low": self._req_float(b, "l"),
@@ -787,7 +789,7 @@ class AlpacaMarketDataAPI:
             session=self.session,
             method="GET",
             path=f"/v1beta3/crypto/{loc}/bars",
-            params=params,
+            options=params,
         )
 
         try:

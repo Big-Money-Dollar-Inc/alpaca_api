@@ -13,30 +13,17 @@ dependencies = [
     "websocket-client>=1.9.0",
 ]
 
-[tool.ruff]
-line-length = 100
-target-version = "py312"
-respect-gitignore = true
-select = [
-  "ANN",   # Type annotation enforcement
-  "TCH",   # Type-checking imports
-  "PGH",   # Pygrep hooks
-  "RUF",   # Ruff-specific rules
-]
-
-ignore = [
-  "ANN101",  # Allow missing type for self
-  "ANN102",  # Allow missing type for cls
-]
-
 [tool.ruff.format]
 quote-style = "double"
 indent-style = "space"
 line-ending = "auto"
 
-[tool.ruff.lint]
+[tool.ruff]
 # A practical “safe + clean” baseline:
-select = [
+line-length = 100
+target-version = "py312"
+respect-gitignore = true
+lint.select = [
   "E", "F", "W",        # pycodestyle + pyflakes
   "I",                  # isort
   "UP",                 # pyupgrade
@@ -47,18 +34,22 @@ select = [
   "N",                  # pep8-naming
   "PL",                 # pylint-derived rules (incl. PLR2004)
   "TRY",                # better exception handling patterns
+  "ANN",   # Type annotation enforcement
+  "TCH",   # Type-checking imports
+  "PGH",   # Pygrep hooks
+  "RUF",   # Ruff-specific rules
 ]
 
 # Keep signal high. You can tighten later.
-ignore = [
+lint.ignore = [
   "E501",     # line length handled by formatter
   "PLR0913",  # too many arguments (often noisy)
   "PLR0912",  # too many branches (sometimes noisy)
   "PLR0915",  # too many statements (sometimes noisy)
 ]
 
-fixable = ["ALL"]
-unfixable = []
+lint.fixable = ["ALL"]
+lint.unfixable = []
 preview = false
 
 [tool.ruff.lint.per-file-ignores]

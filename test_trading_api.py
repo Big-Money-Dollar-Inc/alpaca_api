@@ -15,7 +15,7 @@ assert key is not None, "ALPACA_KEY environment variable is not set."
 market_data = AlpacaTradingAPI(api_key=key, api_secret=secret, paper=True)
 
 
-def test_get_account():
+def test_get_account() -> None:
     data = market_data.get_account()
 
     # Nicely formatted json data printout
@@ -25,7 +25,7 @@ def test_get_account():
 # test_get_account()
 
 
-def test_get_assets():
+def test_get_assets() -> None:
     data = market_data.get_assets()
 
     # Nicely formatted json data printout
@@ -35,7 +35,7 @@ def test_get_assets():
 # test_get_assets()
 
 
-def test_get_asset():
+def test_get_asset() -> None:
     data = market_data.get_asset("AAPL")
 
     # Nicely formatted json data printout
@@ -45,7 +45,7 @@ def test_get_asset():
 # test_get_asset()
 
 
-def test_create_order():
+def test_create_order() -> None:
     data = market_data.create_order(symbol="AAPL", side="buy", qty=2, client_order_id="test")
 
     # Nicely formatted json data printout
@@ -55,7 +55,7 @@ def test_create_order():
 # test_create_order()
 
 
-def test_get_all_orders():
+def test_get_all_orders() -> None:
     data = market_data.get_all_orders()
 
     # Nicely formatted json data printout
@@ -65,7 +65,7 @@ def test_get_all_orders():
 # test_get_all_orders()
 
 
-def test_delete_all_orders():
+def test_delete_all_orders() -> None:
     data = market_data.delete_all_orders()
 
     # Nicely formatted json data printout
@@ -75,7 +75,7 @@ def test_delete_all_orders():
 # test_delete_all_orders()
 
 
-def test_get_order_by_client_order_id():
+def test_get_order_by_client_order_id() -> None:
     data = market_data.get_order_by_client_order_id(client_order_id="test")
 
     # Nicely formatted json data printout
@@ -85,7 +85,7 @@ def test_get_order_by_client_order_id():
 # test_get_order_by_client_order_id()
 
 
-def test_get_order_by_id():
+def test_get_order_by_id() -> None:
     data = market_data.get_order_by_id(order_id="d314af94-7b2e-42be-85dd-aa6978c055ae")
 
     # Nicely formatted json data printout
@@ -96,7 +96,7 @@ def test_get_order_by_id():
 
 
 # TODO: Tricky need to come back to this.
-def test_replace_order_by_id():
+def test_replace_order_by_id() -> None:
     data = market_data.replace_order_by_id(order_id="23ede4f6-e6c7-49ee-bac7-c7846a73678e", qty=3)
 
     # Nicely formatted json data printout
@@ -106,7 +106,7 @@ def test_replace_order_by_id():
 # test_replace_order_by_id()
 
 
-def test_cancel_order_by_id():
+def test_cancel_order_by_id() -> None:
     data = market_data.cancel_order_by_id(order_id="23ede4f6-e6c7-49ee-bac7-c7846a73678e")
 
     # Nicely formatted json data printout

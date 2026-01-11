@@ -17,7 +17,7 @@ class Bar:
 
 @dataclass
 class Auction:
-    datetime: datetime
+    datetime: datetime | None
     exchange_code: str
     auction_price: float
     auction_trade_size: int

@@ -17,7 +17,7 @@ class AlpacaTradingAPIWebSocket:
         api_secret: str,
         use_paper: bool = True,
         on_message_callback: Callable[[dict], Any] | None = None,
-    ):
+    ) -> None:
         """
         :param on_message_callback:
            A function that takes a single dict (the parsed JSON/msgpack payload).
@@ -34,7 +34,7 @@ class AlpacaTradingAPIWebSocket:
         self._handler = on_message_callback or (lambda msg: print(json.dumps(msg, indent=2)))
         self.ws: WebSocketApp = WebSocketApp("")
 
-    def connect(self, streams: list[str]):
+    def connect(self, streams: list[str]) -> None:
         if streams:
             self.streams = streams
 
@@ -50,12 +50,12 @@ class AlpacaTradingAPIWebSocket:
         thread = threading.Thread(target=self.ws.run_forever, daemon=True)
         thread.start()
 
-    def _on_open(self, ws):
+    def _on_open(self, ws: WebSocketApp) -> None:
         ws.send(json.dumps({"action": "auth", "key": self.api_key, "secret": self.api_secret}))
         ws.send(json.dumps({"action": "listen", "data": {"streams": self.streams}}))
         print("Authenticated & listening to:", self.streams)
 
-    def _on_data(self, ws, raw, data_type: int, _):
+    def _on_data(self, ws: WebSocketApp, raw: bytes, data_type: int, _: int) -> None:
         """
         Handles all incoming frames:
          - OPCODE_TEXT   (text JSON)
@@ -91,22 +91,22 @@ class AlpacaTradingAPIWebSocket:
             except Exception as e:
                 print("Error parsing text frame:", e)
 
-    def set_streams(self, streams: list):
+    def set_streams(self, streams: list) -> None:
         self.streams = streams
         print(f"Streams set to: {self.streams}")
         if self.ws is not None and self.ws.sock is not None and self.ws.sock.connected is True:
             self.ws.send(json.dumps({"action": "listen", "data": {"streams": self.streams}}))
             print("Updated listening streams to:", self.streams)
 
-    def _on_error(self, ws, error):
+    def _on_error(self, ws: WebSocketApp, error: str) -> None:
         print("WebSocket error:", error)
 
-    def _on_close(self, ws, code, msg):
+    def _on_close(self, ws: WebSocketApp, code: str, msg: str) -> None:
         print(f"WebSocket closed ({code}): {msg} — reconnecting in 5s…")
         time.sleep(5)
         self.connect(self.streams)
 
-    def close(self):
+    def close(self) -> None:
         if self.ws:
             self.ws.close()
             print("WebSocket connection closed.")

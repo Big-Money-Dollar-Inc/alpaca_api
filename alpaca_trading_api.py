@@ -32,7 +32,7 @@ class AlpacaTradingAPI:
         api_secret: str,
         paper: bool = True,
         request_session: Session | None = None,
-    ):
+    ) -> None:
         """
         :param api_key: Your Alpaca API key ID.
         :param api_secret: Your Alpaca API secret.
@@ -85,7 +85,7 @@ class AlpacaTradingAPI:
             params=params,
         )
 
-        rows = cast(list[dict[str, Any]], data)
+        rows = cast("list[dict[str, Any]]", data)
 
         assets: list[Asset] = []
         asset_fields = set(Asset.__annotations__.keys())
@@ -148,7 +148,7 @@ class AlpacaTradingAPI:
         return cleaned
 
     @staticmethod
-    def _normalise_quantity(qty: Any, asset: str) -> str | int | None:
+    def _normalise_quantity(qty: int, asset: str) -> str | int | None:
         if qty is None:
             return None
         try:
@@ -173,7 +173,7 @@ class AlpacaTradingAPI:
         self,
         symbol: str,
         side: str,
-        qty: Any = None,
+        qty: int = 0,
         notional: float | None = None,
         type: str = "market",
         time_in_force: str = "day",
@@ -187,7 +187,6 @@ class AlpacaTradingAPI:
         take_profit: dict[str, float] | None = None,
         stop_loss: dict[str, float] | None = None,
         asset: str = "stocks",
-        **kwargs: Any,
     ) -> Order:
         """
         Create a new order.
@@ -262,7 +261,7 @@ class AlpacaTradingAPI:
             params=params,
         )
 
-        rows = cast(list[dict[str, Any]], data)
+        rows = cast("list[dict[str, Any]]", data)
 
         orders: list[Order] = []
         order_fields = set(Order.__annotations__.keys())
@@ -277,9 +276,11 @@ class AlpacaTradingAPI:
         """
         Cancel all open orders.
         """
-        data = self._request("DELETE", "/v2/orders")
+        data = alpaca_api_request(
+            base_url=self.base_url, session=self.session, method="DELETE", path="/v2/orders"
+        )
 
-        rows = cast(list[dict[str, Any]], data)
+        rows = cast("list[dict[str, Any]]", data)
 
         orders: list[DeleteOrderResponse] = []
         order_fields = set(DeleteOrderResponse.__annotations__.keys())
@@ -294,8 +295,11 @@ class AlpacaTradingAPI:
         """
         Fetch an order by client order ID.
         """
-        data = self._request(
-            "GET", f"/v2/orders:by_client_order_id?client_order_id={client_order_id}"
+        data = alpaca_api_request(
+            base_url=self.base_url,
+            session=self.session,
+            method="GET",
+            path=f"/v2/orders:by_client_order_id?client_order_id={client_order_id}",
         )
 
         allowed = set(Order.__annotations__.keys())
@@ -383,7 +387,9 @@ class AlpacaTradingAPI:
         """
         List all positions.
         """
-        return self._request("GET", "/v2/positions")
+        return alpaca_api_request(
+            base_url=self.base_url, session=self.session, method="GET", path="/v2/positions"
+        )
 
     def close_all_positions(
         self,
@@ -393,20 +399,37 @@ class AlpacaTradingAPI:
         Close all open positions, optionally canceling associated orders.
         """
         params = {"cancel_orders": str(cancel_orders).lower()}
-        return self._request("DELETE", "/v2/positions", params=params)
+        return alpaca_api_request(
+            base_url=self.base_url,
+            session=self.session,
+            method="DELETE",
+            path="/v2/positions",
+            params=params,
+        )
 
     def get_open_position(self, symbol: str) -> dict[str, Any]:
         """
         Fetch an open position by symbol.
         """
-        return self._request("GET", f"/v2/positions/{symbol}")
+        return alpaca_api_request(
+            base_url=self.base_url,
+            session=self.session,
+            method="GET",
+            path=f"/v2/positions/{symbol}",
+        )
 
-    def close_position(self, symbol_or_asset_id: str, qty, percentage) -> dict[str, Any]:
+    def close_position(self, symbol_or_asset_id: str, qty: int, percentage: int) -> dict[str, Any]:
         """
         Close a position by symbol or asset ID, optionally specifying quantity or percentage.
         """
         data = {"qty": qty, "percentage": percentage}
-        return self._request("DELETE", f"/v2/positions/{symbol_or_asset_id}", json=data)
+        return alpaca_api_request(
+            base_url=self.base_url,
+            session=self.session,
+            method="DELETE",
+            path=f"/v2/positions/{symbol_or_asset_id}",
+            json=data,
+        )
 
     def exercise_option(self) -> dict[str, Any]:
         """
@@ -432,10 +455,18 @@ class AlpacaTradingAPI:
             "date_end": date_end,
             "extended_hours": str(extended_hours).lower(),
         }
-        return self._request("GET", "/v2/account/portfolio/history", params=params)
+        return alpaca_api_request(
+            base_url=self.base_url,
+            session=self.session,
+            method="GET",
+            path="/v2/account/portfolio/history",
+            params=params,
+        )
 
     def get_market_clock(self) -> dict[str, Any]:
         """
         Fetch the current market clock status.
         """
-        return self._request("GET", "/v2/clock")
+        return alpaca_api_request(
+            base_url=self.base_url, session=self.session, method="GET", path="/v2/clock"
+        )
