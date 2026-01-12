@@ -3,11 +3,11 @@ from typing import Any, cast
 
 from requests import Session
 
-from alpaca_api_exceptions import (
+from alpaca_api_request_handler import (
     InsufficientCryptoQuantityError,
     InvalidQuantityError,
+    alpaca_api_request,
 )
-from alpaca_api_request_handler import alpaca_api_request
 from alpaca_trading_api_classes import (
     AllOrdersResponse,
     Asset,

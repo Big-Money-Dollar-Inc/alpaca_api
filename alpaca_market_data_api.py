@@ -4,13 +4,14 @@ from typing import Any
 
 from requests import Session
 
-from alpaca_api_exceptions import (
+from alpaca_api_request_handler import (
     InvalidAlpacaPayloadError,
     InvalidLimitParameterError,
     InvalidSortParameterError,
     JsonResponseError,
+    RequestOptions,
+    alpaca_api_request,
 )
-from alpaca_api_request_handler import RequestOptions, alpaca_api_request
 from alpaca_market_data_classes import (
     Auction,
     Bar,
@@ -132,7 +133,9 @@ class AlpacaMarketDataAPI:
         )
 
         try:
-            auctions_by_symbol = data.get("auctions") or {}
+            auctions_by_symbol: dict[str, Any] = (
+                data["auctions"] if isinstance(data["auctions"], dict) else {}
+            )
 
             parsed: dict[str, Any] = {}
 
@@ -150,10 +153,10 @@ class AlpacaMarketDataAPI:
                 parsed[symbol] = parsed_days
 
             return HistoricalAuctions(
-                datetime=data.get("datetime"),
+                datetime=self._parse_ts(self._req_str(data, "datetime")),
                 auctions=parsed,
-                currency=data.get("currency"),
-                next_page_token=data.get("next_page_token"),
+                currency=self._req_str(data, "currency"),
+                next_page_token=self._req_str(data, "next_page_token"),
             )
 
         except (TypeError, KeyError) as e:
@@ -221,7 +224,7 @@ class AlpacaMarketDataAPI:
         )
 
         try:
-            bars_by_symbol = data.get("bars") or {}
+            bars_by_symbol: dict[str, Any] = data["bars"] if isinstance(data["bars"], dict) else {}
 
             parsed: dict[str, Any] = {}
 
@@ -235,8 +238,8 @@ class AlpacaMarketDataAPI:
 
             return HistoricalBars(
                 bars=parsed,
-                currency=data.get("currency"),
-                next_page_token=data.get("next_page_token"),
+                currency=self._req_str(data, "currency"),
+                next_page_token=self._req_str(data, "next_page_token"),
             )
 
         except (TypeError, KeyError) as e:
@@ -248,17 +251,16 @@ class AlpacaMarketDataAPI:
         Fetch the latest bar data for one or more symbols
         (always returns a dict under the "bars" key).
         """
-        params = {"symbols": ",".join(symbols)}
 
         data = alpaca_api_request(
             base_url=self.base_url,
             session=self.session,
             method="GET",
             path="/v2/stocks/bars/latest",
-            options=RequestOptions(params=params),
+            options=RequestOptions(params={"symbols": symbols}),
         )
         try:
-            bars_by_symbol = data.get("bars") or {}
+            bars_by_symbol: dict[str, Any] = data["bars"] if isinstance(data["bars"], dict) else {}
 
             parsed: dict[str, Any] = {}
 
@@ -281,14 +283,14 @@ class AlpacaMarketDataAPI:
 
             return LatestBars(
                 bars=parsed,
-                currency=data.get("currency"),
+                currency=self._req_str(data, "currency"),
             )
         except (TypeError, KeyError) as e:
             pprint(data)
             raise JsonResponseError() from e
 
     def get_condition_codes(
-        self, ticktype: str | None = "trade", tape: str | None = "A"
+        self, ticktype: str | None = "trade", tape: str = "A"
     ) -> ConditionCodes:
         """
         Fetch the condition codes used in market data.
@@ -302,7 +304,7 @@ class AlpacaMarketDataAPI:
             session=self.session,
             method="GET",
             path=f"/v2/stocks/meta/conditions/{ticktype}",
-            options=RequestOptions(params=params),
+            options=RequestOptions(params={k: v for k, v in params.items() if v is not None}),
         )
 
         try:
@@ -793,7 +795,7 @@ class AlpacaMarketDataAPI:
         )
 
         try:
-            bars_by_symbol = data.get("bars") or {}
+            bars_by_symbol: dict[str, Any] = data["bars"] if isinstance(data["bars"], dict) else {}
 
             parsed: dict[str, Any] = {}
 
