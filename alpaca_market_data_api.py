@@ -1,6 +1,7 @@
+from collections.abc import Mapping
 from datetime import datetime
 from pprint import pprint
-from typing import Any
+from typing import Any, cast
 
 from requests import Session
 
@@ -311,7 +312,8 @@ class AlpacaMarketDataAPI:
             parsed: dict[str, str] = {}
 
             for code, description in data.items():
-                parsed[code] = description
+                if isinstance(description, str):
+                    parsed[code] = description
 
             return ConditionCodes(codes=parsed)
         except (TypeError, KeyError) as e:
@@ -335,7 +337,8 @@ class AlpacaMarketDataAPI:
             parsed: dict[str, str] = {}
 
             for code, description in data.items():
-                parsed[code] = description
+                if isinstance(description, str):
+                    parsed[code] = description
 
             return ExchangeCodes(codes=parsed)
         except (TypeError, KeyError) as e:
@@ -403,18 +406,19 @@ class AlpacaMarketDataAPI:
 
             parsed: dict[str, Any] = {}
 
-            for symbol, list in quotes_by_symbol.items():
-                parsed_quotes = []
-                parsed_quotes.append(
-                    self._parse_historical_quotes_list(list),
-                )
+            if isinstance(quotes_by_symbol, Mapping):
+                for symbol, list in quotes_by_symbol.items():
+                    parsed_quotes = []
+                    parsed_quotes.append(
+                        self._parse_historical_quotes_list(list),
+                    )
 
-                parsed[symbol] = parsed_quotes
+                    parsed[symbol] = parsed_quotes
 
             return HistoricalQuotes(
                 quotes=parsed,
-                currency=data.get("currency"),
-                next_page_token=data.get("next_page_token"),
+                currency=self._req_str(data, "currency"),
+                next_page_token=self._req_str(data, "next_page_token"),
             )
         except (TypeError, KeyError) as e:
             pprint(data)
@@ -427,41 +431,38 @@ class AlpacaMarketDataAPI:
         :param symbols: The stock symbols to fetch the latest quote for.
         :return: JSON response containing the latest quote data.
         """
-        params = {"symbols": symbols}
 
         data = alpaca_api_request(
             base_url=self.base_url,
             session=self.session,
             method="GET",
             path="/v2/stocks/quotes/latest",
-            options=RequestOptions(params=params),
+            options=RequestOptions(params={"symbols": symbols}),
         )
 
         try:
             quotes_by_symbol = data.get("quotes") or {}
 
             parsed: dict[str, Any] = {}
+            if isinstance(quotes_by_symbol, Mapping):
+                list = cast("Mapping[str, object]", quotes_by_symbol)
+                for symbol, list in quotes_by_symbol.items():
+                    parsed_quotes = []
+                    parsed_quotes.append(
+                        {
+                            "timestamp": self._parse_ts(self._req_str(list, "t")),
+                            "bid_exchange": self._req_str(list, "bx"),
+                            "bid_price": self._req_float(list, "bp"),
+                            "bid_size": self._req_int(list, "bs"),
+                            "ask_exchange": self._req_str(list, "ax"),
+                            "ask_price": self._req_float(list, "ap"),
+                            "ask_size": self._req_int(list, "as"),
+                        }
+                    )
 
-            for symbol, list in quotes_by_symbol.items():
-                parsed_quotes = []
-                parsed_quotes.append(
-                    {
-                        "timestamp": self._parse_ts(list.get("t")),
-                        "bid_exchange": self._req_str(list, "bx"),
-                        "bid_price": self._req_float(list, "bp"),
-                        "bid_size": self._req_int(list, "bs"),
-                        "ask_exchange": self._req_str(list, "ax"),
-                        "ask_price": self._req_float(list, "ap"),
-                        "ask_size": self._req_int(list, "as"),
-                    }
-                )
+                    parsed[symbol] = parsed_quotes
 
-                parsed[symbol] = parsed_quotes
-
-            return LatestQuotes(
-                quotes=parsed,
-                currency=data.get("currency"),
-            )
+            return LatestQuotes(quotes=parsed, currency=self._req_str(data, "currency"))
         except (TypeError, KeyError) as e:
             pprint(data)
             raise JsonResponseError() from e
@@ -509,14 +510,13 @@ class AlpacaMarketDataAPI:
         :param symbols: Comma-separated list of stock symbols.
         :return: JSON response containing snapshot data.
         """
-        params = {"symbols": symbols} if symbols else {}
 
         data = alpaca_api_request(
             base_url=self.base_url,
             session=self.session,
             method="GET",
             path="/v2/stocks/snapshots",
-            options=RequestOptions(params=params),
+            options=RequestOptions(params={"symbols": symbols} if symbols else {}),
         )
 
         print(data)
@@ -525,13 +525,33 @@ class AlpacaMarketDataAPI:
             parsed: dict[str, Any] = {}
 
             for symbol, snap in data.items():
-                parsed[symbol] = Snapshot(
-                    daily_bar=self._parse_bar(snap.get("dailyBar")),
-                    latest_quote=self._parse_quote(snap.get("latestQuote")),
-                    latest_trade=self._parse_trade(snap.get("latestTrade")),
-                    minute_bar=self._parse_bar(snap.get("minuteBar")),
-                    previous_daily_bar=self._parse_bar(snap.get("prevDailyBar")),
-                )
+                if isinstance(snap, Mapping):
+                    daily_bar_obj = snap.get("dailyBar")
+                    latest_quote_obj = snap.get("latestQuote")
+                    latest_trade_obj = snap.get("latestTrade")
+                    minute_bar_obj = snap.get("minuteBar")
+                    prev_daily_bar_obj = snap.get("prevDailyBar")
+
+                    if not isinstance(daily_bar_obj, Mapping):
+                        raise InvalidAlpacaPayloadError
+                    if not isinstance(latest_quote_obj, Mapping):
+                        raise InvalidAlpacaPayloadError
+                    if not isinstance(latest_trade_obj, Mapping):
+                        raise InvalidAlpacaPayloadError
+                    if not isinstance(minute_bar_obj, Mapping):
+                        raise InvalidAlpacaPayloadError
+                    if not isinstance(prev_daily_bar_obj, Mapping):
+                        raise InvalidAlpacaPayloadError
+
+                    parsed[symbol] = Snapshot(
+                        daily_bar=self._parse_bar(cast("dict[str, Any]", daily_bar_obj)),
+                        latest_quote=self._parse_quote(cast("dict[str, Any]", latest_quote_obj)),
+                        latest_trade=self._parse_trade(cast("dict[str, Any]", latest_trade_obj)),
+                        minute_bar=self._parse_bar(cast("dict[str, Any]", minute_bar_obj)),
+                        previous_daily_bar=self._parse_bar(
+                            cast("dict[str, Any]", prev_daily_bar_obj)
+                        ),
+                    )
 
             return Snapshots(snapshots=parsed)
 
@@ -575,19 +595,19 @@ class AlpacaMarketDataAPI:
             trades_by_symbol = data.get("trades") or {}
 
             parsed: dict[str, Any] = {}
+            if isinstance(trades_by_symbol, Mapping):
+                for symbol, list in trades_by_symbol.items():
+                    parsed_trades = []
+                    parsed_trades.append(
+                        [self._parse_trade(trade) for trade in list],
+                    )
 
-            for symbol, list in trades_by_symbol.items():
-                parsed_trades = []
-                parsed_trades.append(
-                    [self._parse_trade(trade) for trade in list],
-                )
-
-                parsed[symbol] = parsed_trades
+                    parsed[symbol] = parsed_trades
 
             return HistoricalTrades(
                 trades=parsed,
-                currency=data.get("currency"),
-                next_page_token=data.get("next_page_token"),
+                currency=self._req_str(data, "currency"),
+                next_page_token=self._req_str(data, "next_page_token"),
             )
         except (TypeError, KeyError) as e:
             pprint(data)
@@ -600,27 +620,26 @@ class AlpacaMarketDataAPI:
         :param symbols: The stock symbols to fetch the latest trade for.
         :return: JSON response containing the latest trade data.
         """
-        params = {"symbols": symbols}
 
         data = alpaca_api_request(
             base_url=self.base_url,
             session=self.session,
             method="GET",
             path="/v2/stocks/trades/latest",
-            options=RequestOptions(params=params),
+            options=RequestOptions(params={"symbols": symbols}),
         )
         try:
             trades_by_symbol = data.get("trades") or {}
 
             parsed: dict[str, Any] = {}
+            if isinstance(trades_by_symbol, Mapping):
+                for symbol, list in trades_by_symbol.items():
+                    parsed_trades = []
+                    parsed_trades.append(
+                        self._parse_trade(list),
+                    )
 
-            for symbol, list in trades_by_symbol.items():
-                parsed_trades = []
-                parsed_trades.append(
-                    self._parse_trade(list),
-                )
-
-                parsed[symbol] = parsed_trades
+                    parsed[symbol] = parsed_trades
 
             return {
                 "trades": parsed,
@@ -653,18 +672,19 @@ class AlpacaMarketDataAPI:
 
         try:
             parsed: dict[str, Any] = {}
-
-            for stock in data.get("most_actives", []):
-                symbol = self._req_str(stock, "symbol")
-                parsed[symbol] = MostActiveStock(
-                    symbol=symbol,
-                    volume=self._req_int(stock, "volume"),
-                    trade_count=self._req_int(stock, "trade_count"),
-                )
+            data = data.get("most_actives", [])
+            if isinstance(data, Mapping):
+                for stock in data:
+                    symbol = self._req_str(stock, "symbol")
+                    parsed[symbol] = MostActiveStock(
+                        symbol=symbol,
+                        volume=self._req_int(stock, "volume"),
+                        trade_count=self._req_int(stock, "trade_count"),
+                    )
 
             return MostActiveStocks(
                 most_active_stocks=list(parsed.values()),
-                last_updated=data.get("last_updated"),
+                last_updated=self._parse_ts(self._req_str(parsed, "last_updated")),
             )
 
         except (TypeError, KeyError) as e:
@@ -673,7 +693,7 @@ class AlpacaMarketDataAPI:
 
     def get_top_market_movers(
         self,
-        top: int | None = 10,
+        top: int = 10,
     ) -> TopMarketMovers:
         """
         Fetch top market movers in a given direction.
@@ -682,16 +702,19 @@ class AlpacaMarketDataAPI:
         :param limit: Maximum number of records to return.
         :return: JSON response containing top market movers data.
         """
-        params = {"top": top}
 
         data = alpaca_api_request(
             base_url=self.base_url,
             session=self.session,
             method="GET",
             path="/v1beta1/screener/stocks/movers",
-            options=RequestOptions(params=params),
+            options=RequestOptions(params={"top": top}),
         )
 
+        gainers = data.get("gainers", [])
+        losers = data.get("losers", [])
+
+        assert isinstance(gainers, Mapping) and isinstance(losers, Mapping)
         try:
             return TopMarketMovers(
                 gainers=[
@@ -701,7 +724,7 @@ class AlpacaMarketDataAPI:
                         change=self._req_float(mover, "change"),
                         price=self._req_float(mover, "price"),
                     )
-                    for mover in data.get("gainers", [])
+                    for mover in gainers
                 ],
                 losers=[
                     Mover(
@@ -710,10 +733,10 @@ class AlpacaMarketDataAPI:
                         change=self._req_float(mover, "change"),
                         price=self._req_float(mover, "price"),
                     )
-                    for mover in data.get("losers", [])
+                    for mover in losers
                 ],
-                market_type=data.get("market_type"),
-                last_updated=data.get("last_updated"),
+                market_type=self._req_str(data, "market_type"),
+                last_updated=self._parse_ts(self._req_str(data, "last_updated")),
             )
         except (TypeError, KeyError) as e:
             pprint(data)
@@ -750,67 +773,53 @@ class AlpacaMarketDataAPI:
         page_token: str | None = None,
         sort: str = "asc",
     ) -> HistoricalBars:
-        """
-        Fetch historical crypto bars from Alpaca v1beta3.
-
-        :param loc: Crypto data location, for example "us".
-        :param symbols: List of symbols, for example ["BTC/USD", "ETH/USD"].
-        :param timeframe: Bar aggregation, for example "1Min", "5Min", "1H", "1D", "1W", "3M".
-        :param start: Inclusive start time as datetime (UTC). If provided, formatted RFC3339.
-        :param end: Inclusive end time as datetime (UTC). If provided, formatted RFC3339.
-        :param limit: Max data points across all symbols, 1 to 10000. Default 1000.
-        :param page_token: Pagination token from prior response.
-        :param sort: "asc" or "desc". Default "asc".
-        :return: JSON response with "bars" and optional "next_page_token".
-        """
         if sort not in ("asc", "desc"):
             raise InvalidSortParameterError(sort)
 
-        if limit is not None and not (
-            CRYPTO_MIN_DATA_POINTS <= int(limit) <= CRYPTO_MAX_DATA_POINTS
-        ):
-            raise InvalidLimitParameterError(int(limit))
+        if limit is not None and not (CRYPTO_MIN_DATA_POINTS <= limit <= CRYPTO_MAX_DATA_POINTS):
+            raise InvalidLimitParameterError(limit)
 
-        params: dict[str, Any] = {
+        params: dict[str, str | int | float | list[str]] = {
             "symbols": ",".join(symbols),
             "timeframe": timeframe,
             "sort": sort,
         }
+
         if limit is not None:
             params["limit"] = int(limit)
         if start is not None:
             params["start"] = start.strftime("%Y-%m-%dT%H:%M:%SZ")
         if end is not None:
             params["end"] = end.strftime("%Y-%m-%dT%H:%M:%SZ")
-        if page_token:
+        if page_token is not None:
             params["page_token"] = page_token
 
-        # Endpoint: /v1beta3/crypto/{loc}/bars
         data = alpaca_api_request(
             base_url=self.base_url,
             session=self.session,
             method="GET",
             path=f"/v1beta3/crypto/{loc}/bars",
-            options=params,
+            options=RequestOptions(params=params),
         )
 
         try:
-            bars_by_symbol: dict[str, Any] = data["bars"] if isinstance(data["bars"], dict) else {}
+            bars_raw = data.get("bars")
+            if not isinstance(bars_raw, Mapping):
+                raise InvalidAlpacaPayloadError
 
             parsed: dict[str, Any] = {}
+            for symbol, bar_list_obj in bars_raw.items():
+                if not isinstance(symbol, str):
+                    raise InvalidAlpacaPayloadError
+                if not isinstance(bar_list_obj, list):
+                    raise InvalidAlpacaPayloadError
 
-            for symbol, list in bars_by_symbol.items():
-                parsed_bars = []
-                parsed_bars.append(
-                    self._parse_crypto_bars_list(list),
-                )
-
-                parsed[symbol] = parsed_bars
+                parsed[symbol] = [self._parse_crypto_bars_list(bar_list_obj)]
 
             return HistoricalBars(
                 bars=parsed,
-                currency=data.get("currency"),
-                next_page_token=data.get("next_page_token"),
+                currency=self._req_str(data, "currency"),
+                next_page_token=self._req_str(data, "next_page_token"),
             )
 
         except (TypeError, KeyError) as e:
