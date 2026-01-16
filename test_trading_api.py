@@ -12,11 +12,11 @@ key = os.getenv("ALPACA_KEY")
 assert secret is not None, "ALPACA_SECRET environment variable is not set."
 assert key is not None, "ALPACA_KEY environment variable is not set."
 
-market_data = AlpacaTradingAPI(api_key=key, api_secret=secret, paper=True)
+trading_api = AlpacaTradingAPI(api_key=key, api_secret=secret, paper=True)
 
 
 def test_get_account() -> None:
-    data = market_data.get_account()
+    data = trading_api.get_account()
 
     # Nicely formatted json data printout
     pprint(data)
@@ -26,7 +26,7 @@ def test_get_account() -> None:
 
 
 def test_get_assets() -> None:
-    data = market_data.get_assets()
+    data = trading_api.get_assets()
 
     # Nicely formatted json data printout
     pprint(data)
@@ -36,7 +36,7 @@ def test_get_assets() -> None:
 
 
 def test_get_asset() -> None:
-    data = market_data.get_asset("AAPL")
+    data = trading_api.get_asset("AAPL")
 
     # Nicely formatted json data printout
     pprint(data)
@@ -46,7 +46,7 @@ def test_get_asset() -> None:
 
 
 def test_create_order() -> None:
-    data = market_data.create_order(symbol="AAPL", side="buy", qty=2, client_order_id="test")
+    data = trading_api.create_order(symbol="AAPL", side="buy", qty=2)
 
     # Nicely formatted json data printout
     pprint(data)
@@ -56,7 +56,7 @@ def test_create_order() -> None:
 
 
 def test_get_all_orders() -> None:
-    data = market_data.get_all_orders()
+    data = trading_api.get_all_orders()
 
     # Nicely formatted json data printout
     pprint(data)
@@ -66,7 +66,7 @@ def test_get_all_orders() -> None:
 
 
 def test_delete_all_orders() -> None:
-    data = market_data.delete_all_orders()
+    data = trading_api.delete_all_orders()
 
     # Nicely formatted json data printout
     pprint(data)
@@ -76,7 +76,9 @@ def test_delete_all_orders() -> None:
 
 
 def test_get_order_by_client_order_id() -> None:
-    data = market_data.get_order_by_client_order_id(client_order_id="test")
+    data = trading_api.get_order_by_client_order_id(
+        client_order_id="58486581-2099-4394-a54d-094b5dd1810d"
+    )
 
     # Nicely formatted json data printout
     pprint(data)
@@ -86,7 +88,7 @@ def test_get_order_by_client_order_id() -> None:
 
 
 def test_get_order_by_id() -> None:
-    data = market_data.get_order_by_id(order_id="d314af94-7b2e-42be-85dd-aa6978c055ae")
+    data = trading_api.get_order_by_id(order_id="d314af94-7b2e-42be-85dd-aa6978c055ae")
 
     # Nicely formatted json data printout
     pprint(data)
@@ -97,7 +99,7 @@ def test_get_order_by_id() -> None:
 
 # TODO: Tricky need to come back to this.
 def test_replace_order_by_id() -> None:
-    data = market_data.replace_order_by_id(order_id="23ede4f6-e6c7-49ee-bac7-c7846a73678e", qty=3)
+    data = trading_api.replace_order_by_id(order_id="f3e0b69f-b84d-459d-b8e5-6895b62f3954", qty=3)
 
     # Nicely formatted json data printout
     pprint(data)
@@ -107,7 +109,7 @@ def test_replace_order_by_id() -> None:
 
 
 def test_cancel_order_by_id() -> None:
-    data = market_data.cancel_order_by_id(order_id="23ede4f6-e6c7-49ee-bac7-c7846a73678e")
+    data = trading_api.cancel_order_by_id(order_id="b28fc094-e033-4490-98d1-350eb276638b")
 
     # Nicely formatted json data printout
     pprint(data)

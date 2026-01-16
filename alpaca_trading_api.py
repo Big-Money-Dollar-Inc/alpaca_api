@@ -205,7 +205,7 @@ class AlpacaTradingAPI:
         self,
         symbol: str,
         side: str,
-        qty: int = 0,
+        qty: int | None = None,
         notional: float | None = None,
         type: str = "market",
         time_in_force: str = "day",
@@ -218,54 +218,105 @@ class AlpacaTradingAPI:
         order_class: str | None = None,
         take_profit: dict[str, float] | None = None,
         stop_loss: dict[str, float] | None = None,
-        asset: str = "stocks",
     ) -> Order:
-        cleaned_symbol = self._normalise_symbol(symbol, asset)
-        cleaned_qty = self._normalise_quantity(qty, asset)
+        # ---- basic validation that matches Alpaca rules ----
+        if qty is not None and notional is not None:
+            raise ValueError("Provide either qty or notional, not both.")
 
+        if type in ("limit", "stop_limit") and limit_price is None:
+            raise ValueError("limit_price is required for limit and stop_limit orders.")
+
+        if type in ("stop", "stop_limit") and stop_price is None:
+            raise ValueError("stop_price is required for stop and stop_limit orders.")
+
+        if type == "trailing_stop" and trail_price is None and trail_percent is None:
+            raise ValueError("trail_price or trail_percent is required for trailing_stop orders.")
+
+        if extended_hours and not (type == "limit" and time_in_force == "day"):
+            raise ValueError("extended_hours only works with type='limit' and time_in_force='day'.")
+
+        # If using bracket/oco/oto, Alpaca expects order_class + take_profit/stop_loss rules.
+        # Do not send take_profit/stop_loss unless order_class is set appropriately.
+        if (take_profit is not None or stop_loss is not None) and (
+            order_class is None or order_class in ("", "simple")
+        ):
+            raise ValueError(
+                "take_profit/stop_loss require order_class like 'bracket', 'oto', or 'oco'."
+            )
+
+        # ---- build JSON payload (match Alpaca: strings for numeric fields) ----
         body: dict[str, Any] = {
-            "symbol": cleaned_symbol,
-            "qty": cleaned_qty,
-            "notional": notional,
+            "symbol": symbol,
             "side": side,
             "type": type,
             "time_in_force": time_in_force,
-            "limit_price": limit_price,
-            "stop_price": stop_price,
-            "trail_price": trail_price,
-            "trail_percent": trail_percent,
-            "extended_hours": extended_hours,
-            "client_order_id": client_order_id,
-            "order_class": order_class,
-            "take_profit": take_profit,
-            "stop_loss": stop_loss,
         }
 
-        if cleaned_qty is None:
-            body.pop("qty", None)
+        if qty is not None:
+            body["qty"] = str(qty)
+        if notional is not None:
+            body["notional"] = str(notional)
+
+        if limit_price is not None:
+            body["limit_price"] = str(limit_price)
+        if stop_price is not None:
+            body["stop_price"] = str(stop_price)
+        if trail_price is not None:
+            body["trail_price"] = str(trail_price)
+        if trail_percent is not None:
+            body["trail_percent"] = str(trail_percent)
+
+        # Only include extended_hours when True (don’t send it always)
+        if extended_hours:
+            body["extended_hours"] = True
+
+        if client_order_id is not None:
+            body["client_order_id"] = client_order_id
+
+        # order_class: Alpaca accepts "" or "simple" for basic
+        if order_class is not None:
+            body["order_class"] = order_class
+
+        tp_json: dict[str, str] | None = None
+        if take_profit is not None:
+            lp = take_profit.get("limit_price")
+            if lp is None:
+                raise ValueError("take_profit requires limit_price")
+            tp_json = {"limit_price": str(lp)}
+
+        sl_json: dict[str, str] | None = None
+        if stop_loss is not None:
+            sp = stop_loss.get("stop_price")
+            if sp is None:
+                raise ValueError("stop_loss requires stop_price")
+            sl_json = {"stop_price": str(sp)}
+            lp2 = stop_loss.get("limit_price")
+            if lp2 is not None:
+                sl_json["limit_price"] = str(lp2)
+
+        if tp_json is not None:
+            body["take_profit"] = tp_json
+        if sl_json is not None:
+            body["stop_loss"] = sl_json
 
         resp = alpaca_api_request(
-            base_url=self.base_url,
+            base_url=self.base_url,  # MUST be paper-api or api, not data.alpaca.markets
             session=self.session,
             method="POST",
             path="/v2/orders",
-            options=RequestOptions(json=body),  # <-- IMPORTANT: use RequestOptions properly
+            options=RequestOptions(json=body),
         )
 
         if not isinstance(resp, Mapping):
             raise JsonResponseError()
 
+        resp_d = cast("dict[str, Any]", dict(resp))
+
         allowed = set(Order.__annotations__.keys())
+        payload: dict[str, Any] = {k: v for k, v in resp_d.items() if k in allowed}
 
-        payload: dict[str, Any] = {
-            k: v for k, v in resp.items() if isinstance(k, str) and k in allowed
-        }
-
-        # Alpaca uses key "class" in response, but your model wants "asset_class"
-        cls = resp.get("class")
-        if cls is None:
-            payload["asset_class"] = None
-        elif isinstance(cls, str):
+        cls = resp_d.get("class")
+        if cls is None or isinstance(cls, str):
             payload["asset_class"] = cls
         else:
             raise InvalidAlpacaPayloadError

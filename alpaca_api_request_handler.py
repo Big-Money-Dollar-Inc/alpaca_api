@@ -7,6 +7,9 @@ if TYPE_CHECKING:
 
 HTTP_OK = 200
 HTTP_NO_CONTENT = 204
+HTTP_MULTI_STATUS_CODE = 207
+
+UNPROCESSABLE_ENTITY_ERROR = 422
 
 
 class JsonResponseError(Exception):
@@ -88,7 +91,10 @@ class UnprocessableEntityError(AlpacaAPIError):
     status_code = 422
 
     def __init__(self, message_body: str = "") -> None:
-        super().__init__("The order status is not cancelable.", message_body)
+        super().__init__(
+            "The order status is not cancelable or Input parameters are not recognized.",
+            message_body,
+        )
 
 
 class RateLimitError(AlpacaAPIError):
@@ -140,9 +146,6 @@ def _safe_json(resp: Response) -> dict[str, object]:
     except Exception as e:
         raise JsonResponseError() from e
 
-    if not isinstance(parsed, dict):
-        raise JsonResponseError()
-
     return parsed
 
 
@@ -161,5 +164,11 @@ def alpaca_api_request(
 
     if resp.status_code == HTTP_NO_CONTENT:
         return {}
+
+    if resp.status_code == UNPROCESSABLE_ENTITY_ERROR:
+        raise UnprocessableEntityError()
+
+    if resp.status_code == HTTP_MULTI_STATUS_CODE:
+        return _safe_json(resp)
 
     raise UnknownError(message_body=str(resp.status_code)) from None
