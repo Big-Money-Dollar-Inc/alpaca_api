@@ -1,11 +1,15 @@
-from pprint import pprint
+from collections.abc import Mapping
 from typing import Any, cast
 
 from requests import Session
 
 from alpaca_api_request_handler import (
+    BadRequestError,
     InsufficientCryptoQuantityError,
+    InvalidAlpacaPayloadError,
     InvalidQuantityError,
+    JsonResponseError,
+    RequestOptions,
     alpaca_api_request,
 )
 from alpaca_trading_api_classes import (
@@ -59,39 +63,64 @@ class AlpacaTradingAPI:
         """Fetch your account information."""
 
         data = alpaca_api_request(
-            base_url=self.base_url, session=self.session, method="GET", path="/v2/account"
+            base_url=self.base_url,
+            session=self.session,
+            method="GET",
+            path="/v2/account",
         )
+
+        if not isinstance(data, Mapping):
+            raise JsonResponseError()
 
         allowed = set(GetAccountResponse.__annotations__.keys())
 
-        payload = {k: v for k, v in data.items() if k in allowed}
+        payload: dict[str, Any] = {
+            k: v for k, v in data.items() if isinstance(k, str) and k in allowed
+        }
 
         return GetAccountResponse(**payload)
 
     def get_assets(
-        self, status: str | None = None, asset_class: str | None = None, exchange: str | None = None
+        self,
+        status: str | None = None,
+        asset_class: str | None = None,
+        exchange: str | None = None,
     ) -> GetAssetsResponse:
         """List all assets, optionally filtered by status/class/exchange."""
-        params = {
-            k: v
-            for k, v in {"status": status, "asset_class": asset_class, "exchange": exchange}.items()
-            if v is not None
-        }
+
+        params: dict[str, str | int | float | list[str]] = {}
+        if status is not None:
+            params["status"] = status
+        if asset_class is not None:
+            params["asset_class"] = asset_class
+        if exchange is not None:
+            params["exchange"] = exchange
+
         data = alpaca_api_request(
             base_url=self.base_url,
             session=self.session,
             method="GET",
             path="/v2/assets",
-            params=params,
+            options=RequestOptions(params=params),
         )
 
-        rows = cast("list[dict[str, Any]]", data)
+        if not isinstance(data, list):
+            raise JsonResponseError()
 
         assets: list[Asset] = []
         asset_fields = set(Asset.__annotations__.keys())
 
-        for row in rows:
-            payload = {k: row.get(k) for k in asset_fields}
+        for item in data:
+            if not isinstance(item, Mapping):
+                raise InvalidAlpacaPayloadError
+
+            row = item  # Mapping[str, object]
+            payload: dict[str, Any] = {}
+
+            for k in asset_fields:
+                v = row.get(k)
+                payload[k] = v
+
             assets.append(Asset(**payload))
 
         return GetAssetsResponse(assets=assets)
@@ -104,7 +133,10 @@ class AlpacaTradingAPI:
 
         allowed = set(Asset.__annotations__.keys())
 
-        payload = {k: v for k, v in data.items() if k in allowed}
+        if not isinstance(data, Mapping):
+            raise JsonResponseError()
+
+        payload: dict[str, Any] = {k: v for k, v in data.items() if k in allowed}
 
         payload["asset_class"] = data.get("class")
 
@@ -188,12 +220,10 @@ class AlpacaTradingAPI:
         stop_loss: dict[str, float] | None = None,
         asset: str = "stocks",
     ) -> Order:
-        """
-        Create a new order.
-        """
         cleaned_symbol = self._normalise_symbol(symbol, asset)
         cleaned_qty = self._normalise_quantity(qty, asset)
-        data = {
+
+        body: dict[str, Any] = {
             "symbol": cleaned_symbol,
             "qty": cleaned_qty,
             "notional": notional,
@@ -210,22 +240,35 @@ class AlpacaTradingAPI:
             "take_profit": take_profit,
             "stop_loss": stop_loss,
         }
-        if cleaned_qty is None:
-            data.pop("qty", None)
 
-        data = alpaca_api_request(
+        if cleaned_qty is None:
+            body.pop("qty", None)
+
+        resp = alpaca_api_request(
             base_url=self.base_url,
             session=self.session,
             method="POST",
             path="/v2/orders",
-            json=data,
+            options=RequestOptions(json=body),  # <-- IMPORTANT: use RequestOptions properly
         )
+
+        if not isinstance(resp, Mapping):
+            raise JsonResponseError()
 
         allowed = set(Order.__annotations__.keys())
 
-        payload = {k: v for k, v in data.items() if k in allowed}
+        payload: dict[str, Any] = {
+            k: v for k, v in resp.items() if isinstance(k, str) and k in allowed
+        }
 
-        payload["asset_class"] = data.get("class")
+        # Alpaca uses key "class" in response, but your model wants "asset_class"
+        cls = resp.get("class")
+        if cls is None:
+            payload["asset_class"] = None
+        elif isinstance(cls, str):
+            payload["asset_class"] = cls
+        else:
+            raise InvalidAlpacaPayloadError
 
         return Order(**payload)
 
@@ -240,34 +283,52 @@ class AlpacaTradingAPI:
         symbol: str | None = None,
         side: str | None = None,
     ) -> AllOrdersResponse:
-        """
-        List all orders, optionally filtered by status, symbol, side, etc.
-        """
-        params = {
+        params_raw: dict[str, str | int | float | list[str] | None] = {
             "status": status,
             "limit": limit,
             "after": after,
             "until": until,
             "direction": direction,
-            "nested": str(nested).lower(),
+            "nested": "true" if nested else "false",
             "symbol": symbol,
             "side": side,
         }
+
+        params: dict[str, str | int | float | list[str]] = {
+            k: v for k, v in params_raw.items() if v is not None
+        }
+
         data = alpaca_api_request(
             base_url=self.base_url,
             session=self.session,
             method="GET",
             path="/v2/orders",
-            params=params,
+            options=RequestOptions(params=params),
         )
 
-        rows = cast("list[dict[str, Any]]", data)
+        if not isinstance(data, list):
+            raise JsonResponseError()
 
         orders: list[Order] = []
-        order_fields = set(Order.__annotations__.keys())
+        allowed = set(Order.__annotations__.keys())
 
-        for row in rows:
-            payload = {k: row.get(k) for k in order_fields}
+        for item in data:
+            if not isinstance(item, Mapping):
+                raise InvalidAlpacaPayloadError
+
+            payload: dict[str, Any] = {
+                k: v for k, v in item.items() if isinstance(k, str) and k in allowed
+            }
+
+            # Map Alpaca's "class" -> your "asset_class"
+            cls = item.get("class")
+            if cls is None:
+                payload["asset_class"] = None
+            elif isinstance(cls, str):
+                payload["asset_class"] = cls
+            else:
+                raise InvalidAlpacaPayloadError
+
             orders.append(Order(**payload))
 
         return AllOrdersResponse(orders=orders)
@@ -304,7 +365,10 @@ class AlpacaTradingAPI:
 
         allowed = set(Order.__annotations__.keys())
 
-        payload = {k: v for k, v in data.items() if k in allowed}
+        if not isinstance(data, Mapping):
+            raise JsonResponseError()
+
+        payload: dict[str, Any] = {k: v for k, v in data.items() if k in allowed}
 
         payload["asset_class"] = data.get("class")
 
@@ -323,7 +387,10 @@ class AlpacaTradingAPI:
 
         allowed = set(Order.__annotations__.keys())
 
-        payload = {k: v for k, v in data.items() if k in allowed}
+        if not isinstance(data, Mapping):
+            raise JsonResponseError()
+
+        payload: dict[str, Any] = {k: v for k, v in data.items() if k in allowed}
 
         payload["asset_class"] = data.get("class")
 
@@ -339,10 +406,9 @@ class AlpacaTradingAPI:
         trail_price: float | None = None,
         client_order_id: str | None = None,
     ) -> Order:
-        """
-        Replace an existing order by its ID.
-        """
-        data = {
+        """Replace an existing order by its ID."""
+
+        body_raw: dict[str, Any] = {
             "qty": qty,
             "time_in_force": time_in_force,
             "limit_price": limit_price,
@@ -350,22 +416,33 @@ class AlpacaTradingAPI:
             "trail_price": trail_price,
             "client_order_id": client_order_id,
         }
+        body: dict[str, Any] = {k: v for k, v in body_raw.items() if v is not None}
 
-        data = alpaca_api_request(
+        resp = alpaca_api_request(
             base_url=self.base_url,
             session=self.session,
             method="PATCH",
             path=f"/v2/orders/{order_id}",
-            json=data,
+            options=RequestOptions(json=body),  # <-- use RequestOptions consistently
         )
 
-        pprint(data)
+        if not isinstance(resp, Mapping):
+            raise JsonResponseError()
 
         allowed = set(Order.__annotations__.keys())
 
-        payload = {k: v for k, v in data.items() if k in allowed}
+        payload: dict[str, Any] = {
+            k: v for k, v in resp.items() if isinstance(k, str) and k in allowed
+        }
 
-        payload["asset_class"] = data.get("class")
+        # Alpaca response key "class" -> your model key "asset_class"
+        cls = resp.get("class")
+        if cls is None:
+            payload["asset_class"] = None
+        elif isinstance(cls, str):
+            payload["asset_class"] = cls
+        else:
+            raise InvalidAlpacaPayloadError
 
         return Order(**payload)
 
@@ -391,21 +468,25 @@ class AlpacaTradingAPI:
             base_url=self.base_url, session=self.session, method="GET", path="/v2/positions"
         )
 
-    def close_all_positions(
-        self,
-        cancel_orders: bool = True,
-    ) -> dict[str, Any]:
-        """
-        Close all open positions, optionally canceling associated orders.
-        """
-        params = {"cancel_orders": str(cancel_orders).lower()}
-        return alpaca_api_request(
+    def close_all_positions(self, cancel_orders: bool = True) -> dict[str, Any]:
+        """Close all open positions, optionally canceling associated orders."""
+
+        params: dict[str, str | int | float | list[str]] = {
+            "cancel_orders": "true" if cancel_orders else "false"
+        }
+
+        data = alpaca_api_request(
             base_url=self.base_url,
             session=self.session,
             method="DELETE",
             path="/v2/positions",
-            params=params,
+            options=RequestOptions(params=params),
         )
+
+        if not isinstance(data, dict):
+            raise JsonResponseError()
+
+        return data
 
     def get_open_position(self, symbol: str) -> dict[str, Any]:
         """
@@ -418,18 +499,37 @@ class AlpacaTradingAPI:
             path=f"/v2/positions/{symbol}",
         )
 
-    def close_position(self, symbol_or_asset_id: str, qty: int, percentage: int) -> dict[str, Any]:
+    def close_position(
+        self,
+        symbol_or_asset_id: str,
+        qty: int | None = None,
+        percentage: int | None = None,
+    ) -> dict[str, Any]:
         """
-        Close a position by symbol or asset ID, optionally specifying quantity or percentage.
+        Close a position by symbol or asset ID.
+        Provide either qty or percentage (not both). If neither is provided, closes the full position.
         """
-        data = {"qty": qty, "percentage": percentage}
-        return alpaca_api_request(
+        if qty is not None and percentage is not None:
+            raise BadRequestError()
+
+        body: dict[str, Any] = {}
+        if qty is not None:
+            body["qty"] = qty
+        if percentage is not None:
+            body["percentage"] = percentage
+
+        resp = alpaca_api_request(
             base_url=self.base_url,
             session=self.session,
             method="DELETE",
             path=f"/v2/positions/{symbol_or_asset_id}",
-            json=data,
+            options=RequestOptions(json=body if body else None),
         )
+
+        if not isinstance(resp, dict):
+            raise JsonResponseError()
+
+        return resp
 
     def exercise_option(self) -> dict[str, Any]:
         """
@@ -445,23 +545,31 @@ class AlpacaTradingAPI:
         date_end: str | None = None,
         extended_hours: bool = False,
     ) -> dict[str, Any]:
-        """
-        Fetch account portfolio history.
-        """
-        params = {
+        """Fetch account portfolio history."""
+
+        params_raw: dict[str, str | None] = {
             "period": period,
             "timeframe": timeframe,
             "date_start": date_start,
             "date_end": date_end,
-            "extended_hours": str(extended_hours).lower(),
+            "extended_hours": "true" if extended_hours else "false",
         }
-        return alpaca_api_request(
+        params: dict[str, str | int | float | list[str]] = {
+            k: v for k, v in params_raw.items() if v is not None
+        }
+
+        resp = alpaca_api_request(
             base_url=self.base_url,
             session=self.session,
             method="GET",
             path="/v2/account/portfolio/history",
-            params=params,
+            options=RequestOptions(params=params),
         )
+
+        if not isinstance(resp, dict):
+            raise JsonResponseError()
+
+        return resp
 
     def get_market_clock(self) -> dict[str, Any]:
         """
